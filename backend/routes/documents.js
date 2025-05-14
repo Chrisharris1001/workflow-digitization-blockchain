@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const fs = require('fs');
-const path = require('path');
+// const path = require('path');
 const { InfuraProvider, Wallet, Contract, keccak256 } = require('ethers');
 require('dotenv').config();
 
