@@ -50,6 +50,7 @@ export default function UpdateStatusPage() {
                         onChange={(e) => setStatus(e.target.value)}
                         className="w-full p-3 border border-gray-300 rounded-lg text-gray-900"
                     >
+                        <option value="">Select status</option>
                         <option value="AccountingApproved">Accounting Approved</option>
                         <option value="LegalApproved">Legal Approved</option>
                         <option value="RectorApproved">Rector Approved</option>

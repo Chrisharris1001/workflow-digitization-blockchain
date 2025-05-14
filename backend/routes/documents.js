@@ -64,6 +64,7 @@ router.post('/update-status', upload.single('document'), async (req, res) => {
         }
 
         const status = statusEnum[statusStr];
+        console.log('Received statusStr:', statusStr);
         if (status === undefined) {
             return res.status(400).json({ error: 'Invalid status selected.' });
         }
