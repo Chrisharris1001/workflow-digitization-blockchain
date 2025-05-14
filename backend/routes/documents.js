@@ -1,177 +1,111 @@
-const express = require("express");
-const multer = require("multer");
-const fs = require("fs");
-const crypto = require("crypto");
-const { ethers } = require("ethers");
-const Document = require("../models/Document");
-const contractData = require("../contract.json");
-require("dotenv").config({path: require("path").resolve(__dirname, "../.env")});
-
+const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
+const { InfuraProvider, Wallet, Contract, keccak256 } = require('ethers');
+require('dotenv').config();
 
-// File upload setup
-const upload = multer({ dest: "uploads/" });
+const contractJson = require('../contract.json');
 
-// Ethereum setup
-const provider = new ethers.JsonRpcProvider(`https://sepolia.infura.io/v3/${process.env.INFURA_API_KEY}`);
-// console.log("PRIVATE_KEY:", process.env.PRIVATE_KEY || "(undefined)");
-// console.log("PRIVATE_KEY length:", process.env.PRIVATE_KEY ? process.env.PRIVATE_KEY.length : "N/A");
-// console.log("PRIVATE_KEY sample (first 6 chars):", process.env.PRIVATE_KEY.slice(0, 6));
-const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+// Set up file upload
+const upload = multer({ dest: 'uploads/' });
 
-// console.log("Contract address:", contractData.address);
-// console.log("ABI loaded?", Array.isArray(contractData.abi));
+// Replace with your actual deployed address
+const contractAddress = '0x884041Cb11DB62a7f783eABF9d5CB0da6d57F42E';
 
-const contract = new ethers.Contract(contractData.address, contractData.abi, wallet);
+const provider = new InfuraProvider('sepolia', process.env.INFURA_API_KEY);
+const wallet = new Wallet(process.env.PRIVATE_KEY, provider);
+const contract = new Contract(contractAddress, contractJson.abi, wallet);
 
-// POST /submit-doc
-router.post("/submit-doc", upload.single("document"), async (req, res) => {
+// Map readable status to enum values used in the smart contract
+const statusEnum = {
+    Submitted: 0,
+    AccountingApproved: 1,
+    LegalApproved: 2,
+    RectorApproved: 3,
+};
+
+// -------------------------------
+// POST /api/documents/submit-doc
+// -------------------------------
+router.post('/submit-doc', upload.single('document'), async (req, res) => {
     try {
-        const { docId, name } = req.body;
-        const filePath = req.file.path;
+        const { docId } = req.body;
+        const file = req.file;
 
-        if(!docId || !name || !req.file) {
-            return res.status(400).json({error: "Missing required fields."});
+        if (!docId || !file) {
+            return res.status(400).json({ error: 'Missing required fields.' });
         }
 
-        // Hash the file using SHA-256
-        const fileBuffer = fs.readFileSync(filePath);
-        const hash = crypto.createHash("sha256").update(fileBuffer).digest("hex");
-        const hashBytes32 = "0x" + hash;
+        const fileBuffer = fs.readFileSync(file.path);
+        const hash = keccak256(fileBuffer);
 
-        // Call smart contract
-        const tx = await contract.submitDocument(docId, hashBytes32);
+        const tx = await contract.submitDocument(docId, hash);
         await tx.wait();
 
-        // Save to MongoDB
-        const newDoc = new Document({
-            docId,
-            name,
-            currentStatus: "Submitted",
-            history: [
-                {
-                    status: "Submitted",
-                    author: wallet.address,
-                    timestamp: new Date(),
-                    hash: hashBytes32,
-                    txHash: tx.hash,
-                },
-            ],
-        });
-
-        await newDoc.save();
-
-        res.status(200).json({
-            message: "Document submitted and notarized successfully.",
-            docId,
-            hash: hashBytes32,
-            txHash: tx.hash,
-        });
+        res.json({ message: '✅ Document submitted.', txHash: tx.hash });
     } catch (err) {
-        console.error("Error in /submit-doc:", err);
-        res.status(500).json({ error: err.message });
+        console.error('Submit error:', err);
+        res.status(500).json({ error: err.reason || err.message || 'Submission failed' });
     }
 });
 
-router.post("/update-status", upload.single("document"), async (req, res) => {
+// ----------------------------------------
+// POST /api/documents/update-status
+// ----------------------------------------
+router.post('/update-status', upload.single('document'), async (req, res) => {
     try {
-        const {docId, status} = req.body;
-        const filePath = req.file.path;
+        const { docId, status: statusStr } = req.body;
+        const file = req.file;
 
-        if (!docId || !status || !req.file) {
-            return res.status(400).json({error: "Missing required fields."});
+        if (!docId || !statusStr || !file) {
+            return res.status(400).json({ error: 'Missing required fields.' });
         }
 
-        const statusEnum = {
-            Submitted: 0,
-            Signed1: 1,
-            Signed2: 2,
-            Signed3: 3
-        };
-
-        const statusIndex = statusEnum[status];
-        if (statusIndex === undefined) {
-            return res.status(400).json({error: "Missing required fields."});
+        const status = statusEnum[statusStr];
+        if (status === undefined) {
+            return res.status(400).json({ error: 'Invalid status selected.' });
         }
 
-        const fileBuffer = fs.readFileSync(filePath);
-        const hash = crypto.createHash("sha256").update(fileBuffer).digest("hex");
-        const hashBytes32 = "0x" + hash;
+        const fileBuffer = fs.readFileSync(file.path);
+        const hash = keccak256(fileBuffer);
 
-        const tx = await contract.updateStatus(docId, statusIndex, hashBytes32);
+        const tx = await contract.updateStatus(docId, status, hash);
         await tx.wait();
 
-        const document = await Document.findOne({docId});
-        if (!document) {
-            return res.status(404).json({error: "Document not found."});
-        }
-
-        document.currentStatus = status;
-        document.history.push({
-            status,
-            author: wallet.address,
-            timestamp: new Date(),
-            hash: hashBytes32,
-            txHash: tx.hash,
-        });
-        await document.save();
-        res.status(200).json({
-            message: `Document status updated to ${status}`,
-            docId,
-            hash: hashBytes32,
-            txHash: tx.hash,
-        });
+        res.json({ message: '✅ Status updated.', txHash: tx.hash });
     } catch (err) {
-        console.error("Error in /update-status:", err);
-        res.status(500).json({error: err.message});
+        console.error('Update error:', err);
+        res.status(500).json({ error: err.reason || err.message || 'Update failed' });
     }
 });
 
-router.post("/verify", upload.single("document"), async (req, res) => {
+// -------------------------------
+// POST /api/documents/verify
+// -------------------------------
+router.post('/verify', upload.single('document'), async (req, res) => {
     try {
-        const { docId, status } = req.body;
-        const filePath = req.file?.path;
+        const { docId, status: statusStr } = req.body;
+        const file = req.file;
 
-        if (!docId || !status || !filePath) {
-            return res.status(400).json({ error: "Missing docId, status, or file" });
+        if (!docId || !statusStr || !file) {
+            return res.status(400).json({ error: 'Missing required fields.' });
         }
 
-        // Convert status to enum index
-        const statusEnum = {
-            Submitted: 0,
-            Signed1: 1,
-            Signed2: 2,
-            Signed3: 3
-        };
-
-        const statusIndex = statusEnum[status];
-        const timestamp = await contract.getDocumentTimestamp(docId, statusIndex);
-        console.log(`Blockchain timestamp for ${docId} at ${status}: ${timestamp}`);
-
-        if (statusIndex === undefined) {
-            return res.status(400).json({ error: "Invalid status value." });
+        const status = statusEnum[statusStr];
+        if (status === undefined) {
+            return res.status(400).json({ error: 'Invalid status selected.' });
         }
 
-        // Hash the uploaded file
-        const fileBuffer = fs.readFileSync(filePath);
-        const localHash = "0x" + crypto.createHash("sha256").update(fileBuffer).digest("hex");
+        const fileBuffer = fs.readFileSync(file.path);
+        const hash = keccak256(fileBuffer);
 
-        // Query smart contract for original hash
-        console.log("Calling verifyDocument on:", contract.target || contract.address);
-        console.log("docId:", docId, "statusIndex:", statusIndex, "localHash:", localHash);
-
-        const isValid = await contract.verifyDocument(docId, statusIndex, localHash);
-
-        res.status(200).json({
-            docId,
-            status,
-            localHash,
-            valid: isValid,
-            message: isValid ? "✅ File is authentic" : "❌ File does NOT match blockchain record"
-        });
+        const isValid = await contract.verifyDocument(docId, status, hash);
+        res.json({ valid: isValid });
     } catch (err) {
-        console.error("Error in /verify:", err);
-        res.status(500).json({ error: err.message });
+        console.error('Verify error:', err);
+        res.status(500).json({ error: err.reason || err.message || 'Verification failed' });
     }
 });
 

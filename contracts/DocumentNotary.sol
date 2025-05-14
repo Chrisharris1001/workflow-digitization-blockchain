@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 contract DocumentNotary {
-    enum Status { Submitted, Signed1, Signed2, Signed3 }
+    enum Status { Submitted, AccountingApproved, LegalApproved, RectorApproved }
 
     struct Document {
         string docId;
