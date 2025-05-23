@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import axios from 'axios';
+import Link from 'next/link';
 
 export default function VerifyPage() {
     const [docId, setDocId] = useState('');
@@ -76,6 +77,7 @@ export default function VerifyPage() {
                         Verify Document
                     </button>
                 </form>
+                <Link href="/dashboard" className="mt-4 w-full inline-block text-center bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg">Go to dashboard</Link>
 
                 {result && (
                     <div
