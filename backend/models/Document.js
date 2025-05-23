@@ -11,6 +11,10 @@ const HistorySchema = new mongoose.Schema({
 const DocumentSchema = new mongoose.Schema({
     docId: String,
     name: String,
+    version: {
+        type: Number,
+        default: 1,
+    },
     currentStatus: String,
     history: [HistorySchema],
 });

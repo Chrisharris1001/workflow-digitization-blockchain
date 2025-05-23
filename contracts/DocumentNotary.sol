@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 contract DocumentNotary {
-    enum Status { Submitted, AccountingApproved, LegalApproved, RectorApproved }
+    enum Status { Submitted, AccountingApproved, LegalApproved, RectorApproved, Rejected }
 
     struct Document {
         string docId;
@@ -17,6 +17,7 @@ contract DocumentNotary {
 
     event DocumentSubmitted(string docId, address sender, bytes32 hash, uint256 timestamp);
     event DocumentStatusUpdated(string docId, Status status, address approver, bytes32 hash, uint256 timestamp);
+    event DocumentRejected(string docId, address rejectedBy, uint256 timestamp);
 
     modifier docExists(string memory docId) {
         require(documents[docId].exists, "Document does not exist");
@@ -49,6 +50,16 @@ contract DocumentNotary {
         doc.approvers.push(msg.sender);
 
         emit DocumentStatusUpdated(docId, status, msg.sender, hash, block.timestamp);
+    }
+
+    function rejectDocument(string memory docId) external docExists(docId) {
+        Document storage doc = documents[docId];
+        require(!doc.statusReached[Status.Rejected], "Document already rejected");
+
+        doc.statusReached[Status.Rejected] = true;
+        doc.timestamps[Status.Rejected] = block.timestamp;
+
+        emit DocumentRejected(docId, msg.sender, block.timestamp);
     }
 
     function verifyDocument(string memory docId, Status status, bytes32 hash) external view docExists(docId) returns (bool) {
