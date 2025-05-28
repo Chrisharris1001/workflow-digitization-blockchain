@@ -1,6 +1,16 @@
 {
-  "address": "0x8B1429fF058FB545B8Dc2115797159587C6F2db5",
+  "address": "0x8fE3Ca2f16eAA3E35441d89852203B40365E2280",
   "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": false, "internalType": "string", "name": "docId", "type": "string" },
+        { "indexed": false, "internalType": "address", "name": "rejectedBy", "type": "address" },
+        { "indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+      ],
+      "name": "DocumentRejected",
+      "type": "event"
+    },
     {
       "anonymous": false,
       "inputs": [
@@ -37,6 +47,17 @@
     },
     {
       "inputs": [
+        { "internalType": "string", "name": "docId", "type": "string" }
+      ],
+      "name": "getDocumentStatus",
+      "outputs": [
+        { "internalType": "enum DocumentNotary.Status", "name": "", "type": "uint8" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
         { "internalType": "string", "name": "docId", "type": "string" },
         { "internalType": "enum DocumentNotary.Status", "name": "status", "type": "uint8" }
       ],
@@ -45,6 +66,15 @@
         { "internalType": "uint256", "name": "", "type": "uint256" }
       ],
       "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "string", "name": "docId", "type": "string" }
+      ],
+      "name": "rejectDocument",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -60,7 +90,7 @@
     {
       "inputs": [
         { "internalType": "string", "name": "docId", "type": "string" },
-        { "internalType": "enum DocumentNotary.Status", "name": "status", "type": "uint8" },
+        { "internalType": "enum DocumentNotary.Status", "name": "newStatus", "type": "uint8" },
         { "internalType": "bytes32", "name": "hash", "type": "bytes32" }
       ],
       "name": "updateStatus",
@@ -71,12 +101,14 @@
     {
       "inputs": [
         { "internalType": "string", "name": "docId", "type": "string" },
-        { "internalType": "enum DocumentNotary.Status", "name": "status", "type": "uint8" },
-        { "internalType": "bytes32", "name": "hash", "type": "bytes32" }
+        { "internalType": "uint8", "name": "requestedStatus", "type": "uint8" },
+        { "internalType": "bytes32", "name": "submittedHash", "type": "bytes32" }
       ],
       "name": "verifyDocument",
       "outputs": [
-        { "internalType": "bool", "name": "", "type": "bool" }
+        { "internalType": "bool", "name": "isValid", "type": "bool" },
+        { "internalType": "bool", "name": "isPartial", "type": "bool" },
+        { "internalType": "string", "name": "message", "type": "string" }
       ],
       "stateMutability": "view",
       "type": "function"

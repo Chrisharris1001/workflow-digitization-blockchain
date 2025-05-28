@@ -6,11 +6,10 @@ contract DocumentNotary {
 
     struct Document {
         string docId;
+        bytes32 hash;
+        Status status;
         address[] approvers;
-        mapping(Status => bool) statusReached;
         mapping(Status => uint256) timestamps;
-        mapping(Status => bytes32) docHashes;
-        bool exists;
     }
 
     mapping(string => Document) private documents;
@@ -20,55 +19,100 @@ contract DocumentNotary {
     event DocumentRejected(string docId, address rejectedBy, uint256 timestamp);
 
     modifier docExists(string memory docId) {
-        require(documents[docId].exists, "Document does not exist");
-        _;
+       require(documents[docId].timestamps[Status.Submitted] != 0, "Document does not exist");
+       _;
     }
 
     function submitDocument(string memory docId, bytes32 hash) external {
-        require(!documents[docId].exists, "Document already submitted");
+        require(documents[docId].timestamps[Status.Submitted] == 0, "Document already submitted");
 
-        Document storage doc = documents[docId];
-        doc.docId = docId;
-        doc.statusReached[Status.Submitted] = true;
-        doc.timestamps[Status.Submitted] = block.timestamp;
-        doc.docHashes[Status.Submitted] = hash;
-        doc.approvers.push(msg.sender);
-        doc.exists = true;
+        documents[docId].docId = docId;
+        documents[docId].hash = hash;
+        documents[docId].status = Status.Submitted;
+        documents[docId].approvers = new address[](0);
+        documents[docId].timestamps[Status.Submitted] = block.timestamp;
 
         emit DocumentSubmitted(docId, msg.sender, hash, block.timestamp);
     }
 
-    function updateStatus(string memory docId, Status status, bytes32 hash) external docExists(docId) {
-        Document storage doc = documents[docId];
+    function updateStatus(string memory docId, Status newStatus, bytes32 hash) external docExists(docId) {
+        require(newStatus != Status.Rejected, "Use rejectDocument for rejection");
+        Status currentStatus = documents[docId].status;
 
-        // Prevent re-approving the same status
-        require(!doc.statusReached[status], "Status already approved");
 
-        doc.statusReached[status] = true;
-        doc.timestamps[status] = block.timestamp;
-        doc.docHashes[status] = hash;
-        doc.approvers.push(msg.sender);
+        if (newStatus == Status.AccountingApproved) {
+            require(currentStatus == Status.Submitted, "Document must be submitted first");
+        } else if (newStatus == Status.LegalApproved) {
+            require(currentStatus == Status.AccountingApproved, "Accounting approval required first");
+        } else if (newStatus == Status.RectorApproved) {
+            require(currentStatus == Status.LegalApproved, "Legal approval required first");
+        } else {
+            revert("Invalid status update");
+        }
 
-        emit DocumentStatusUpdated(docId, status, msg.sender, hash, block.timestamp);
+        documents[docId].status = newStatus;
+        documents[docId].approvers.push(msg.sender);
+        documents[docId].hash = hash;
+
+        emit DocumentStatusUpdated(docId, newStatus, msg.sender, hash, block.timestamp);
     }
 
     function rejectDocument(string memory docId) external docExists(docId) {
-        Document storage doc = documents[docId];
-        require(!doc.statusReached[Status.Rejected], "Document already rejected");
+        require(documents[docId].status != Status.Rejected, "Document already rejected");
 
-        doc.statusReached[Status.Rejected] = true;
-        doc.timestamps[Status.Rejected] = block.timestamp;
+        documents[docId].status = Status.Rejected;
+        documents[docId].approvers.push(msg.sender);
+        documents[docId].timestamps[Status.Rejected] = block.timestamp;
 
         emit DocumentRejected(docId, msg.sender, block.timestamp);
     }
 
-    function verifyDocument(string memory docId, Status status, bytes32 hash) external view docExists(docId) returns (bool) {
-        Document storage doc = documents[docId];
-        return doc.docHashes[status] == hash;
+    function verifyDocument(string memory docId, uint8 requestedStatus, bytes32 submittedHash) public view returns (bool isValid, bool isPartial, string memory message)
+    {
+        if (documents[docId].timestamps[Status.Submitted] == 0) {
+            return (false, false, "Document not found");
+        }
+
+        if (documents[docId].hash != submittedHash) {
+            return (false, false, "Hash mismatch");
+        }
+
+        if (documents[docId].status == Status.Rejected) {
+            return (false, false, "Document was rejected");
+        }
+
+        if (uint8(documents[docId].status) == requestedStatus) {
+            return (true, false, "Fully approved for requested status");
+        }
+
+        // If the document is at a higher status than requested, it should still be considered valid
+        if (uint8(documents[docId].status) > requestedStatus && documents[docId].status != Status.Rejected) {
+            return (true, false, "Document has been approved for a higher status.");
+        }
+
+        if (uint8(documents[docId].status) < requestedStatus) {
+            string memory currentStatusMsg;
+            if (documents[docId].status == Status.AccountingApproved) {
+                currentStatusMsg = "Document is currently approved by Accounting.";
+            } else if (documents[docId].status == Status.LegalApproved) {
+                currentStatusMsg = "Document is currently approved by Legal.";
+            } else if (documents[docId].status == Status.Submitted) {
+                currentStatusMsg = "Document is only submitted, not yet approved.";
+            } else {
+                currentStatusMsg = "Document is at a lower approval stage.";
+            }
+            return (false, true, currentStatusMsg);
+        }
+
+        return (false, false, "Document not valid for requested status");
     }
 
     function getDocumentTimestamp(string memory docId, Status status) external view docExists(docId) returns (uint256) {
         return documents[docId].timestamps[status];
+    }
+
+    function getDocumentStatus(string memory docId) external view docExists(docId) returns (Status) {
+        return documents[docId].status;
     }
 
     function getDocumentApprovers(string memory docId) external view docExists(docId) returns (address[] memory) {

@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 export default function VerifyPage() {
     const [docId, setDocId] = useState('');
-    const [status, setStatus] = useState('DepartmentApproved');
+    const [status, setStatus] = useState('AccountingApproved');
     const [file, setFile] = useState(null);
     const [result, setResult] = useState('');
 
@@ -24,7 +24,15 @@ export default function VerifyPage() {
 
         try {
             const res = await axios.post('http://localhost:3000/api/documents/verify', formData);
-            setResult(res.data.valid ? '✅ Document is valid' : '❌ Document is NOT valid');
+            const { valid, partiallyApproved, message, blockchainStatus } = res.data;
+
+            if (valid) {
+                setResult(`✅ Document is fully valid. ${message}`);
+            } else if (partiallyApproved) {
+                setResult(`🟡 ${message}`);
+            } else {
+                setResult(`❌ Document is NOT valid. ${message}`);
+            }
         } catch (err) {
             console.error(err);
             setResult(`❌ Error: ${err.response?.data?.error || err.message}`);
@@ -65,8 +73,8 @@ export default function VerifyPage() {
                                 />
                             </label>
                             <span className="ml-3 text-sm text-gray-600 truncate max-w-[200px]">
-                {file ? file.name : 'No file selected'}
-              </span>
+                                {file ? file.name : 'No file selected'}
+                            </span>
                         </div>
                     </div>
 
@@ -77,14 +85,16 @@ export default function VerifyPage() {
                         Verify Document
                     </button>
                 </form>
+
                 <Link href="/dashboard" className="mt-4 w-full inline-block text-center bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg">Go to dashboard</Link>
 
                 {result && (
                     <div
                         className={`mt-4 text-sm px-4 py-2 rounded max-h-40 overflow-auto whitespace-pre-wrap break-words ${
-                            result.startsWith('✅')
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
+                            result.startsWith('✅') ? 'bg-green-100 text-green-800'
+                                : result.startsWith('🟡') ? 'bg-yellow-100 text-yellow-800'
+                                    : result.startsWith('⚠️') ? 'bg-orange-100 text-orange-800'
+                                        : 'bg-red-100 text-red-800'
                         }`}
                         style={{ fontFamily: 'monospace' }}
                     >

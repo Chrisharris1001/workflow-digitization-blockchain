@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const fs = require('fs');
-// const path = require('path');
 const pdfParse = require('pdf-parse');
 const { InfuraProvider, Wallet, Contract, keccak256 } = require('ethers');
 require('dotenv').config();
@@ -10,17 +9,14 @@ require('dotenv').config();
 const Document = require('../models/Document');
 const contractJson = require('../contract.json');
 
-// Set up file upload
-const upload = multer({ dest: 'uploads/' });
 
-// Replace with your actual deployed address
-const contractAddress = '0x8B1429fF058FB545B8Dc2115797159587C6F2db5';
+const upload = multer({ dest: 'uploads/' });
+const contractAddress = '0x8fE3Ca2f16eAA3E35441d89852203B40365E2280';
 
 const provider = new InfuraProvider('sepolia', process.env.INFURA_API_KEY);
 const wallet = new Wallet(process.env.PRIVATE_KEY, provider);
 const contract = new Contract(contractAddress, contractJson.abi, wallet);
 
-// Map readable status to enum values used in the smart contract
 const statusEnum = {
     Submitted: 0,
     AccountingApproved: 1,
@@ -29,15 +25,47 @@ const statusEnum = {
     Rejected: 4,
 };
 
-// -------------------------------
-// POST /api/documents/submit-doc
-// -------------------------------
 router.post('/submit-doc', upload.single('document'), async (req, res) => {
     try {
         const { docId } = req.body;
         const file = req.file;
-        const existing = await Document.findOne({ docId });
-        const version = existing ? existing.version + 1 : 1;
+
+        const fileBuffer = fs.readFileSync(file.path);
+        const parsed = await pdfParse(fileBuffer);
+        const hash = keccak256(fileBuffer);
+
+        const rejectAndLog = async (reason) => {
+            try {
+                await contract.rejectDocument(docId);
+                await Document.findOneAndUpdate(
+                    {docId},
+                    {
+                        docId,
+                        name: file.originalname,
+                        status: 'Rejected',
+                        currentStatus: 'Rejected',
+                        hash: hash,
+                        timestamp: new Date(),
+                        $push: {
+                            history: {
+                                status: 'Rejected',
+                                author: wallet.address,
+                                timestamp: new Date(),
+                                hash: hash,
+                                txHash: '',
+                                docId: docId,
+                                reason: reason,
+                            }
+                        }
+                    },
+                    { upsert: true }
+                );
+                return res.status(200).json({ status: 'Rejected!', reason });
+            } catch (err) {
+                console.error('Error rejecting document:', err);
+                return res.status(500).json({ error: 'Failed to reject the document!' });
+            }
+        };
 
         if (!docId || !file) {
             return res.status(400).json({ error: 'Missing required fields.' });
@@ -55,18 +83,8 @@ router.post('/submit-doc', upload.single('document'), async (req, res) => {
             return res.status(400).json({ error: 'Document ID must start with "TRIP-" followed by at least 3 digits.' });
         }
 
-
-        const fileBuffer = fs.readFileSync(file.path);
-        const parsed = await pdfParse(fileBuffer);
-        const hash = keccak256(fileBuffer);
-
         if (!parsed.text.includes('Purpose of trip')) {
             return res.status(400).json({ error: 'PDF missing required content: "Purpose of trip"' });
-        }
-
-        // Check if the document already exists in the database
-        if (existing && existing.status !== 'Rejected') {
-            return res.status(400).json({ error: 'Document already submitted and not rejected' });
         }
 
         const tx = await contract.submitDocument(docId, hash);
@@ -82,7 +100,6 @@ router.post('/submit-doc', upload.single('document'), async (req, res) => {
                 currentStatus: 'Submitted',
                 hash: hash,
                 timestamp: new Date(),
-                version,
                 $push: {
                     history: {
                         status: 'Submitted',
@@ -90,7 +107,6 @@ router.post('/submit-doc', upload.single('document'), async (req, res) => {
                         timestamp: new Date(),
                         hash: hash,
                         txHash: tx.hash, // Save txHash
-                        version: version,
                         docId: docId,
                     }
                 }
@@ -98,16 +114,13 @@ router.post('/submit-doc', upload.single('document'), async (req, res) => {
             { upsert: true }
         );
 
-        res.json({ message: '✅ Document submitted.', txHash: tx.hash });
+        res.json({ message: 'The document is submitted!', txHash: tx.hash });
     } catch (err) {
         console.error('Submit error:', err);
-        res.status(500).json({ error: err.reason || err.message || 'Submission failed' });
+        res.status(500).json({ error: err.reason || err.message || 'Submission failed!' });
     }
 });
 
-// ----------------------------------------
-// POST /api/documents/update-status
-// ----------------------------------------
 router.post('/update-status', upload.single('document'), async (req, res) => {
     try {
         const { docId, status: statusStr } = req.body;
@@ -124,7 +137,34 @@ router.post('/update-status', upload.single('document'), async (req, res) => {
         }
 
         const fileBuffer = fs.readFileSync(file.path);
+        const parsed = await pdfParse(fileBuffer);
         const hash = keccak256(fileBuffer);
+
+        if(!parsed.text.includes('Purpose of trip')) {
+            await contract.rejectDocument(docId);
+            await Document.findOneAndUpdate
+                ({docId},
+                    {
+                        status: 'Rejected',
+                        currentStatus: 'Rejected',
+                        hash: hash,
+                        timestamp: new Date(),
+                        $push: {
+                            history: {
+                                status: 'Rejected',
+                                author: wallet.address,
+                                timestamp: new Date(),
+                                hash: hash,
+                                txHash: '',
+                                version: 1,
+                                docId: docId,
+                                reason: 'Missing required content: "Purpose of trip"'
+                            }
+                        }
+                    }
+                );
+            return res.status(200).json({ status: 'Rejected!', reason: 'Missing required content: "Purpose of trip"' });
+        }
 
         const tx = await contract.updateStatus(docId, status, hash);
         await tx.wait();
@@ -150,16 +190,13 @@ router.post('/update-status', upload.single('document'), async (req, res) => {
             }
         )
 
-        res.json({ message: '✅ Status updated.', txHash: tx.hash });
+        res.json({ message: 'Status updated!', txHash: tx.hash });
     } catch (err) {
         console.error('Update error:', err);
-        res.status(500).json({ error: err.reason || err.message || 'Update failed' });
+        res.status(500).json({ error: err.reason || err.message || 'Update failed!' });
     }
 });
 
-// -------------------------------
-// POST /api/documents/verify
-// -------------------------------
 router.post('/verify', upload.single('document'), async (req, res) => {
     try {
         const { docId, status: statusStr } = req.body;
@@ -177,17 +214,20 @@ router.post('/verify', upload.single('document'), async (req, res) => {
         const fileBuffer = fs.readFileSync(file.path);
         const hash = keccak256(fileBuffer);
 
-        const isValid = await contract.verifyDocument(docId, status, hash);
-        res.json({ valid: isValid });
+        const [isValid, isPartial, message] = await contract.verifyDocument(docId, status, hash);
+
+        res.json({
+            valid: isValid,
+            partiallyApproved: isPartial,
+            message: message,
+            blockchainStatus: statusStr
+        });
     } catch (err) {
         console.error('Verify error:', err);
         res.status(500).json({ error: err.reason || err.message || 'Verification failed' });
     }
 });
 
-// -------------------------------
-// GET /api/documents
-// -------------------------------
 router.get('/dashboard', async (req, res) => {
     try {
         const docs = await Document.find({});
