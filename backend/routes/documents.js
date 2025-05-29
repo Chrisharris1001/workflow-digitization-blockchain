@@ -83,8 +83,33 @@ router.post('/submit-doc', upload.single('document'), async (req, res) => {
             return res.status(400).json({ error: 'Document ID must start with "TRIP-" followed by at least 3 digits.' });
         }
 
-        if (!parsed.text.includes('Purpose of trip')) {
-            return res.status(400).json({ error: 'PDF missing required content: "Purpose of trip"' });
+        // Define required phrases for different document types
+        const requiredPhrases = [
+            'Purpose of trip',
+            'Budget approval',
+            'Employee details',
+            'Travel itinerary',
+            'Expense report',
+            'Research project',
+            'Conference participation',
+            'Course syllabus',
+            'Student list',
+            'Faculty approval',
+            'Grant application',
+            'Academic transcript',
+            'Enrollment certificate',
+            'Thesis submission',
+            'Internship agreement',
+            'Scholarship application',
+            'Exam schedule',
+            'Laboratory report',
+            'Meeting minutes',
+            'Committee decision',
+        ];
+        // Check if at least one required phrase is present
+        const containsRequiredPhrase = requiredPhrases.some(phrase => parsed.text.includes(phrase));
+        if (!containsRequiredPhrase) {
+            return res.status(400).json({ error: 'PDF missing required content. It must contain at least one of the required phrases.' });
         }
 
         const tx = await contract.submitDocument(docId, hash);
@@ -140,7 +165,32 @@ router.post('/update-status', upload.single('document'), async (req, res) => {
         const parsed = await pdfParse(fileBuffer);
         const hash = keccak256(fileBuffer);
 
-        if(!parsed.text.includes('Purpose of trip')) {
+        // Define required phrases for different document types
+        const requiredPhrases = [
+            'Purpose of trip',
+            'Budget approval',
+            'Employee details',
+            'Travel itinerary',
+            'Expense report',
+            'Research project',
+            'Conference participation',
+            'Course syllabus',
+            'Student list',
+            'Faculty approval',
+            'Grant application',
+            'Academic transcript',
+            'Enrollment certificate',
+            'Thesis submission',
+            'Internship agreement',
+            'Scholarship application',
+            'Exam schedule',
+            'Laboratory report',
+            'Meeting minutes',
+            'Committee decision',
+        ];
+        // Check if at least one required phrase is present
+        const containsRequiredPhrase = requiredPhrases.some(phrase => parsed.text.includes(phrase));
+        if (!containsRequiredPhrase) {
             await contract.rejectDocument(docId);
             await Document.findOneAndUpdate
                 ({docId},
@@ -158,12 +208,12 @@ router.post('/update-status', upload.single('document'), async (req, res) => {
                                 txHash: '',
                                 version: 1,
                                 docId: docId,
-                                reason: 'Missing required content: "Purpose of trip"'
+                                reason: 'PDF missing required content. It must contain at least one of the required phrases.'
                             }
                         }
                     }
                 );
-            return res.status(200).json({ status: 'Rejected!', reason: 'Missing required content: "Purpose of trip"' });
+            return res.status(200).json({ status: 'Rejected!', reason: 'PDF missing required content. It must contain at least one of the required phrases.' });
         }
 
         const tx = await contract.updateStatus(docId, status, hash);
