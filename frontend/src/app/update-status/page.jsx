@@ -23,7 +23,7 @@ export default function UpdateStatusPage() {
         formData.append('document', file);
 
         try {
-            const res = await axios.post('http://localhost:3000/api/documents/update-status', formData);
+            const res = await axios.post('http://localhost:5000/api/documents/update-status', formData);
             setMessage(`✅ Status updated! Tx: ${res.data.txHash}`);
             setDocId('');
             setStatus('DepartmentApproved');

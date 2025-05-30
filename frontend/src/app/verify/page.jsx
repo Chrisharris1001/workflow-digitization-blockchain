@@ -23,7 +23,7 @@ export default function VerifyPage() {
         formData.append('document', file);
 
         try {
-            const res = await axios.post('http://localhost:3000/api/documents/verify', formData);
+            const res = await axios.post('http://localhost:5000/api/documents/verify', formData);
             const { valid, partiallyApproved, message, blockchainStatus } = res.data;
 
             if (valid) {

@@ -14,7 +14,7 @@ export default function DashboardPage() {
 
   const fetchDocuments = () => {
     setLoading(true);
-    axios.get('http://localhost:3000/api/documents/dashboard')
+    axios.get('http://localhost:5000/api/documents/dashboard')
         .then(res => setDocuments(res.data))
         .catch(() => setDocuments([]))
         .finally(() => setLoading(false));

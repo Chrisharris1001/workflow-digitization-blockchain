@@ -23,7 +23,7 @@ export default function SubmitPage() {
         formData.append('document', file);
 
         try {
-            const res = await axios.post('http://localhost:3000/api/documents/submit-doc', formData);
+            const res = await axios.post('http://localhost:5000/api/documents/submit-doc', formData);
             setStatus(`✅ Success! Tx: ${res.data.txHash}`);
             setDocId('');
             setName('');
