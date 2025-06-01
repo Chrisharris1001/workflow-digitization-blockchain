@@ -112,6 +112,18 @@
       ],
       "stateMutability": "view",
       "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "string", "name": "docId", "type": "string" },
+        { "internalType": "enum DocumentNotary.Status", "name": "status", "type": "uint8" },
+        { "internalType": "bytes32", "name": "hash", "type": "bytes32" }
+      ],
+      "name": "signDocument",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
     }
   ]
 }
+

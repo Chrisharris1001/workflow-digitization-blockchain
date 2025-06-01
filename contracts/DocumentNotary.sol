@@ -8,6 +8,7 @@ contract DocumentNotary {
         string docId;
         bytes32 hash;
         Status status;
+        Status previousStatus;
         address[] approvers;
         mapping(Status => uint256) timestamps;
     }
@@ -15,8 +16,8 @@ contract DocumentNotary {
     mapping(string => Document) private documents;
 
     event DocumentSubmitted(string docId, address sender, bytes32 hash, uint256 timestamp);
-    event DocumentStatusUpdated(string docId, Status status, address approver, bytes32 hash, uint256 timestamp);
     event DocumentRejected(string docId, address rejectedBy, uint256 timestamp);
+    event DocumentSigned(string docId, Status status, address signer, bytes32 hash, uint256 timestamp);
 
     modifier docExists(string memory docId) {
        require(documents[docId].timestamps[Status.Submitted] != 0, "Document does not exist");
@@ -35,10 +36,9 @@ contract DocumentNotary {
         emit DocumentSubmitted(docId, msg.sender, hash, block.timestamp);
     }
 
-    function updateStatus(string memory docId, Status newStatus, bytes32 hash) external docExists(docId) {
+    function signDocument(string memory docId, Status newStatus, bytes32 hash) external docExists(docId) {
         require(newStatus != Status.Rejected, "Use rejectDocument for rejection");
         Status currentStatus = documents[docId].status;
-
 
         if (newStatus == Status.AccountingApproved) {
             require(currentStatus == Status.Submitted, "Document must be submitted first");
@@ -50,21 +50,35 @@ contract DocumentNotary {
             revert("Invalid status update");
         }
 
+        documents[docId].previousStatus = currentStatus;
         documents[docId].status = newStatus;
         documents[docId].approvers.push(msg.sender);
         documents[docId].hash = hash;
+        documents[docId].timestamps[newStatus] = block.timestamp;
 
-        emit DocumentStatusUpdated(docId, newStatus, msg.sender, hash, block.timestamp);
+        emit DocumentSigned(docId, newStatus, msg.sender, hash, block.timestamp);
     }
 
     function rejectDocument(string memory docId) external docExists(docId) {
         require(documents[docId].status != Status.Rejected, "Document already rejected");
-
+        documents[docId].previousStatus = documents[docId].status;
         documents[docId].status = Status.Rejected;
         documents[docId].approvers.push(msg.sender);
         documents[docId].timestamps[Status.Rejected] = block.timestamp;
-
         emit DocumentRejected(docId, msg.sender, block.timestamp);
+    }
+
+    function revertToPreviousStatus(string memory docId) external docExists(docId) {
+        require(documents[docId].status == Status.Rejected, "Can only revert from Rejected status");
+        require(
+            documents[docId].previousStatus == Status.AccountingApproved ||
+            documents[docId].previousStatus == Status.LegalApproved,
+            "Can only revert to an approval status"
+        );
+        Status prev = documents[docId].previousStatus;
+        documents[docId].status = prev;
+        documents[docId].timestamps[prev] = block.timestamp;
+        // Optionally, clear previousStatus or keep for audit
     }
 
     function verifyDocument(string memory docId, uint8 requestedStatus, bytes32 submittedHash) public view returns (bool isValid, bool isPartial, string memory message)

@@ -11,7 +11,7 @@ const contractJson = require('../contract.json');
 
 
 const upload = multer({ dest: 'uploads/' });
-const contractAddress = '0x8fE3Ca2f16eAA3E35441d89852203B40365E2280';
+const contractAddress = '0x4BE5AF0dB8945dE0A901A21fAc17063Ef893e5BF';
 
 const provider = new InfuraProvider('sepolia', process.env.INFURA_API_KEY);
 const wallet = new Wallet(process.env.PRIVATE_KEY, provider);
@@ -146,7 +146,7 @@ router.post('/submit-doc', upload.single('document'), async (req, res) => {
     }
 });
 
-router.post('/update-status', upload.single('document'), async (req, res) => {
+router.post('/sign', upload.single('document'), async (req, res) => {
     try {
         const { docId, status: statusStr } = req.body;
         const file = req.file;
@@ -156,94 +156,18 @@ router.post('/update-status', upload.single('document'), async (req, res) => {
         }
 
         const status = statusEnum[statusStr];
-        console.log('Received statusStr:', statusStr);
         if (status === undefined) {
             return res.status(400).json({ error: 'Invalid status selected.' });
         }
 
         const fileBuffer = fs.readFileSync(file.path);
-        const parsed = await pdfParse(fileBuffer);
         const hash = keccak256(fileBuffer);
 
-        // Define required phrases for different document types
-        const requiredPhrases = [
-            'Purpose of trip',
-            'Budget approval',
-            'Employee details',
-            'Travel itinerary',
-            'Expense report',
-            'Research project',
-            'Conference participation',
-            'Course syllabus',
-            'Student list',
-            'Faculty approval',
-            'Grant application',
-            'Academic transcript',
-            'Enrollment certificate',
-            'Thesis submission',
-            'Internship agreement',
-            'Scholarship application',
-            'Exam schedule',
-            'Laboratory report',
-            'Meeting minutes',
-            'Committee decision',
-        ];
-        // Check if at least one required phrase is present
-        const containsRequiredPhrase = requiredPhrases.some(phrase => parsed.text.includes(phrase));
-        if (!containsRequiredPhrase) {
-            await contract.rejectDocument(docId);
-            await Document.findOneAndUpdate
-                ({docId},
-                    {
-                        status: 'Rejected',
-                        currentStatus: 'Rejected',
-                        hash: hash,
-                        timestamp: new Date(),
-                        $push: {
-                            history: {
-                                status: 'Rejected',
-                                author: wallet.address,
-                                timestamp: new Date(),
-                                hash: hash,
-                                txHash: '',
-                                version: 1,
-                                docId: docId,
-                                reason: 'PDF missing required content. It must contain at least one of the required phrases.'
-                            }
-                        }
-                    }
-                );
-            return res.status(200).json({ status: 'Rejected!', reason: 'PDF missing required content. It must contain at least one of the required phrases.' });
-        }
-
-        const tx = await contract.updateStatus(docId, status, hash);
-        await tx.wait();
-
-        await Document.findOneAndUpdate(
-            {docId},
-            {
-                status: statusStr,
-                currentStatus: statusStr,
-                hash: hash,
-                timestamp: new Date(),
-                $push: {
-                    history: {
-                        status: statusStr,
-                        author: wallet.address,
-                        timestamp: new Date(),
-                        hash: hash,
-                        txHash: tx.hash,
-                        version: 1,
-                        docId: docId,
-                    }
-                }
-            }
-        )
-
-        res.json({ message: 'Status updated!', txHash: tx.hash });
+        // Only return the hash, do not call the smart contract or check required phrases
+        res.json({ message: 'Validated. Ready for blockchain signature.', hash: hash });
     } catch (err) {
-        console.error('Update error:', err);
-        res.status(500).json({ error: err.reason || err.message || 'Update failed!' });
+        console.error('Sign error:', err);
+        res.status(500).json({ error: err.reason || err.message || 'Sign failed!' });
     }
 });
 
@@ -275,6 +199,45 @@ router.post('/verify', upload.single('document'), async (req, res) => {
     } catch (err) {
         console.error('Verify error:', err);
         res.status(500).json({ error: err.reason || err.message || 'Verification failed' });
+    }
+});
+
+router.post('/update-document', async (req, res) => {
+    try {
+        const { docId, status, hash, txHash, author } = req.body;
+        if (!docId || !status || !hash || !txHash || !author) {
+            return res.status(400).json({ error: 'docId, status, hash, txHash, and author are required.' });
+        }
+        const updated = await Document.findOneAndUpdate(
+            { docId },
+            {
+                $set: {
+                    status,
+                    currentStatus: status,
+                    hash,
+                    timestamp: new Date(),
+                    txHash,
+                    author
+                },
+                $push: {
+                    history: {
+                        status,
+                        hash,
+                        timestamp: new Date(),
+                        txHash,
+                        author
+                    }
+                }
+            },
+            { new: true }
+        );
+        if (!updated) {
+            return res.status(404).json({ error: 'Document not found.' });
+        }
+        res.json({ success: true, document: updated });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to update document status.' });
     }
 });
 

@@ -7,7 +7,7 @@ export default function Home() {
         <h1 className="text-2xl font-bold text-gray-800 mb-2">Workflow Digitization Home</h1>
         <nav className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
           <Link href="/submit" className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-base font-semibold text-center">Submit a document</Link>
-          <Link href="/update-status" className="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-base font-semibold text-center">Update status of a document</Link>
+          <Link href="/sign" className="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-base font-semibold text-center">Sign a document</Link>
           <Link href="/verify" className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-base font-semibold text-center">Verify a document</Link>
           <Link href="/dashboard" className="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-base font-semibold text-center">Dashboard</Link>
         </nav>

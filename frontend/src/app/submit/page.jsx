@@ -76,7 +76,7 @@ export default function SubmitPage() {
                         Submit
                     </button>
                 </form>
-                <Link href="/update-status" className="mt-4 w-full inline-block text-center bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg">Go to Update Status</Link>
+                <Link href="/sign" className="mt-4 w-full inline-block text-center bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg">Go to sign page</Link>
                 {status && (
                     <div
                         className={`mt-4 text-sm px-4 py-2 rounded relative max-h-40 overflow-auto whitespace-pre-wrap break-words ${
