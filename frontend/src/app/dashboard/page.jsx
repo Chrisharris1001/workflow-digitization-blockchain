@@ -98,15 +98,13 @@ export default function DashboardPage() {
                                   className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium">
                               Sign
                             </Link>
-                            {doc.filePath && (
-                              <a
-                                href={`http://localhost:5000/${doc.filePath}`}
-                                download
-                                className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-medium"
-                              >
-                                Download
-                              </a>
-                            )}
+                            <a
+                              href={`http://localhost:5000/api/documents/download/${encodeURIComponent(doc.filename)}`}
+                              className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-medium"
+                              download
+                            >
+                              Download
+                            </a>
                           </td>
                         </tr>
                     );

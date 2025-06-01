@@ -16,6 +16,7 @@ const DocumentSchema = new mongoose.Schema({
         default: 1,
     },
     currentStatus: String,
+    filename: String,
     history: [HistorySchema],
 });
 

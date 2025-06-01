@@ -8,7 +8,7 @@ require('dotenv').config();
 
 const Document = require('../models/Document');
 const contractJson = require('../contract.json');
-
+const documentController = require('../controllers/documentController');
 
 const upload = multer({ dest: 'uploads/' });
 const contractAddress = '0x4BE5AF0dB8945dE0A901A21fAc17063Ef893e5BF';
@@ -121,6 +121,7 @@ router.post('/submit-doc', upload.single('document'), async (req, res) => {
             {
                 docId,
                 name: file.originalname, // Save file name
+                filename: file.filename, // Save multer-generated filename
                 status: 'Submitted',
                 currentStatus: 'Submitted',
                 hash: hash,
@@ -249,5 +250,7 @@ router.get('/dashboard', async (req, res) => {
         res.status(500).json({ error: err.message || 'Failed to fetch documents' });
     }
 });
+
+router.get('/download/:filename', documentController.downloadDocument);
 
 module.exports = router;
