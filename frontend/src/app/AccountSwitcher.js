@@ -20,7 +20,7 @@ export default function AccountSwitcher() {
         {account ? 'Change Account' : 'Connect MetaMask'}
       </button>
       <span className="font-mono text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded">
-        {account ? account : 'No account connected'}
+        {account ? `${account.slice(0, 7)}...${account.slice(-6)}` : 'No account connected'}
       </span>
     </div>
   );

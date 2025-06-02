@@ -170,7 +170,7 @@ export default function DashboardPage() {
                 Refresh
               </button>
               <a href="/"
-                 className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium flex items-center">Home</a>
+                 className="px-3 py-1 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium flex items-center">Home</a>
             </div>
           </div>
           {loading ? <p className="text-gray-600">Loading...</p> : (
@@ -201,7 +201,7 @@ export default function DashboardPage() {
                           </td>
                           <td className="px-4 py-2 flex gap-2">
                             <Link href={`http://localhost:3000/sign?docId=${encodeURIComponent(doc.docId)}&status=${getNextStatus(doc)}`}
-                                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium">
+                                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">
                               Sign
                             </Link>
                             <a
