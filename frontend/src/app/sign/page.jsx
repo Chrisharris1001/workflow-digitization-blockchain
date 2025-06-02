@@ -7,7 +7,7 @@ import contractJSON from '../contract.json';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
-const CONTRACT_ADDRESS = '0x4BE5AF0dB8945dE0A901A21fAc17063Ef893e5BF';
+const CONTRACT_ADDRESS = '0xe35dE5dca335e8ad597794e54Cf62eb700817639';
 const CONTRACT_ABI = contractJSON.abi;
 
 export default function SignPage() {
@@ -32,7 +32,7 @@ function SignPageContent() {
     const statusEnum = {
         AccountingApproved: 1,
         LegalApproved: 2,
-        RectorApproved: 3,
+        RectorApproved: 3
     };
 
     // Helper to get the previous department based on the current status
@@ -44,6 +44,33 @@ function SignPageContent() {
                 return 'Accounting Department';
             case 'RectorApproved':
                 return 'Legal Department';
+        }
+    };
+
+    // Handler for rejecting a document
+    const handleReject = async (e) => {
+        e.preventDefault();
+        if (!docId) {
+            setMessage('⚠️ Document ID is required to reject.');
+            return;
+        }
+        setLoading(true);
+        setMessage('Rejecting document...');
+        try {
+            // Call backend to reject the document
+            const res = await axios.post('http://localhost:5000/api/documents/reject', {
+                docId,
+                status: 'Rejected',
+                reason: `Rejected by user from Accounting`
+            });
+            setMessage(`❌ Document rejected. Reason: ${res.data.reason || 'No reason provided.'}`);
+            setDocId('');
+            setStatus('AccountingApproved');
+            setFile(null);
+        } catch (err) {
+            setMessage(`❌ Error rejecting document: ${err.response?.data?.error || err.message}`);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -98,6 +125,8 @@ function SignPageContent() {
             setDocId('');
             setStatus('AccountingApproved');
             setFile(null);
+            // Redirect to dashboard to force refresh
+            // window.location.href = '/dashboard';
         } catch (err) {
             console.error(err);
             // Custom error handling for MetaMask user rejection
@@ -135,7 +164,7 @@ function SignPageContent() {
                         value={status}
                         onChange={(e) => setStatus(e.target.value)}
                         className="w-full p-3 border border-gray-300 rounded-lg text-gray-900"
-                        disabled={!!initialStatus}
+                        disabled={!!initialStatus && initialStatus !== ''}
                     >
                         <option value="">Select status</option>
                         <option value="AccountingApproved">Accounting Approved</option>
@@ -158,12 +187,23 @@ function SignPageContent() {
                             </span>
                         </div>
                     </div>
-                    <button
-                        type="submit"
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg"
-                    >
-                        Sign
-                    </button>
+                    <div className="flex gap-4">
+                        <button
+                            type="submit"
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg"
+                            disabled={loading}
+                        >
+                            Sign
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleReject}
+                            className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg"
+                            disabled={loading}
+                        >
+                            Reject
+                        </button>
+                    </div>
                 </form>
                 <Link href="/verify" className="mt-4 w-full inline-block text-center bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg">Go to Verify Page</Link>
                 {message && (

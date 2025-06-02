@@ -8,10 +8,9 @@ require('dotenv').config();
 
 const Document = require('../models/Document');
 const contractJson = require('../contract.json');
-const documentController = require('../controllers/documentController');
 
 const upload = multer({ dest: 'uploads/' });
-const contractAddress = '0x4BE5AF0dB8945dE0A901A21fAc17063Ef893e5BF';
+const contractAddress = '0xe35dE5dca335e8ad597794e54Cf62eb700817639';
 
 const provider = new InfuraProvider('sepolia', process.env.INFURA_API_KEY);
 const wallet = new Wallet(process.env.PRIVATE_KEY, provider);
@@ -22,7 +21,15 @@ const statusEnum = {
     AccountingApproved: 1,
     LegalApproved: 2,
     RectorApproved: 3,
-    Rejected: 4,
+    Rejected: 4
+};
+
+const statusMap = {
+    0: 'Submitted',
+    1: 'AccountingApproved',
+    2: 'LegalApproved',
+    3: 'RectorApproved',
+    4: 'Rejected'
 };
 
 router.post('/submit-doc', upload.single('document'), async (req, res) => {
@@ -33,39 +40,6 @@ router.post('/submit-doc', upload.single('document'), async (req, res) => {
         const fileBuffer = fs.readFileSync(file.path);
         const parsed = await pdfParse(fileBuffer);
         const hash = keccak256(fileBuffer);
-
-        const rejectAndLog = async (reason) => {
-            try {
-                await contract.rejectDocument(docId);
-                await Document.findOneAndUpdate(
-                    {docId},
-                    {
-                        docId,
-                        name: file.originalname,
-                        status: 'Rejected',
-                        currentStatus: 'Rejected',
-                        hash: hash,
-                        timestamp: new Date(),
-                        $push: {
-                            history: {
-                                status: 'Rejected',
-                                author: wallet.address,
-                                timestamp: new Date(),
-                                hash: hash,
-                                txHash: '',
-                                docId: docId,
-                                reason: reason,
-                            }
-                        }
-                    },
-                    { upsert: true }
-                );
-                return res.status(200).json({ status: 'Rejected!', reason });
-            } catch (err) {
-                console.error('Error rejecting document:', err);
-                return res.status(500).json({ error: 'Failed to reject the document!' });
-            }
-        };
 
         if (!docId || !file) {
             return res.status(400).json({ error: 'Missing required fields.' });
@@ -123,7 +97,6 @@ router.post('/submit-doc', upload.single('document'), async (req, res) => {
                 name: file.originalname, // Save file name
                 filename: file.filename, // Save multer-generated filename
                 status: 'Submitted',
-                currentStatus: 'Submitted',
                 hash: hash,
                 timestamp: new Date(),
                 $push: {
@@ -214,7 +187,6 @@ router.post('/update-document', async (req, res) => {
             {
                 $set: {
                     status,
-                    currentStatus: status,
                     hash,
                     timestamp: new Date(),
                     txHash,
@@ -242,15 +214,83 @@ router.post('/update-document', async (req, res) => {
     }
 });
 
-router.get('/dashboard', async (req, res) => {
+router.post('/reject', async (req, res) => {
     try {
-        const docs = await Document.find({});
-        res.json(docs);
+        const { docId, status, reason } = req.body;
+        if (!docId) {
+            return res.status(400).json({ error: 'docId is required.' });
+        }
+
+        // Always set status to 'Rejected' for any department
+        const tx = await contract.rejectDocument(docId, reason || 'Rejected');
+        await tx.wait();
+
+        // Find the document to get its current status
+        const doc = await Document.findOne({ docId });
+        if (!doc) {
+            return res.status(404).json({ error: 'Document not found.' });
+        }
+
+        // Always set newStatus to 'Rejected'
+        let newStatus = 'Rejected';
+        let revertHistory = null;
+
+        // Determine department (for now, hardcoded to Accounting, but should be dynamic in a real app)
+        let department = 'Accounting';
+        // If you have department info in the request/session, use that instead
+        if (req.body.department) {
+            department = req.body.department;
+        }
+
+        // Add department to history for rejection
+        const historyEntry = {
+            status: newStatus,
+            reason: reason || 'Rejected',
+            timestamp: new Date(),
+            department,
+            txHash: tx.hash,
+            author: wallet.address
+        };
+
+        // Update the document in the database
+        const updateOps = {
+            $set: {
+                status: newStatus,
+                lastAction: {
+                    action: 'Rejected',
+                    department,
+                    reason: reason || 'Rejected',
+                    timestamp: new Date(),
+                },
+            },
+            $push: { history: historyEntry },
+        };
+        if (revertHistory) {
+            updateOps.$push.history = revertHistory;
+        }
+        const updated = await Document.findOneAndUpdate(
+            { docId },
+            updateOps,
+            { new: true }
+        );
+        if (!updated) {
+            return res.status(404).json({ error: 'Document not found.' });
+        }
+        res.json({ success: true, document: updated });
     } catch (err) {
-        res.status(500).json({ error: err.message || 'Failed to fetch documents' });
+        console.error(err);
+        res.status(500).json({ error: 'Failed to update document status.' });
     }
 });
 
-router.get('/download/:filename', documentController.downloadDocument);
+// Get all documents for dashboard (Admin sees all, others filter on frontend)
+router.get('/dashboard', async (req, res) => {
+    try {
+        const docs = await Document.find({}).sort({ timestamp: -1 });
+        res.json(docs);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch documents for dashboard.' });
+    }
+});
 
 module.exports = router;

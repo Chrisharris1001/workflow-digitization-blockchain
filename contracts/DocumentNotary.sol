@@ -11,6 +11,8 @@ contract DocumentNotary {
         Status previousStatus;
         address[] approvers;
         mapping(Status => uint256) timestamps;
+        string rejectionReason;
+        Status[] statusHistory; // Track all status changes
     }
 
     mapping(string => Document) private documents;
@@ -32,6 +34,7 @@ contract DocumentNotary {
         documents[docId].status = Status.Submitted;
         documents[docId].approvers = new address[](0);
         documents[docId].timestamps[Status.Submitted] = block.timestamp;
+        documents[docId].statusHistory.push(Status.Submitted); // Add to history
 
         emit DocumentSubmitted(docId, msg.sender, hash, block.timestamp);
     }
@@ -55,30 +58,52 @@ contract DocumentNotary {
         documents[docId].approvers.push(msg.sender);
         documents[docId].hash = hash;
         documents[docId].timestamps[newStatus] = block.timestamp;
+        documents[docId].statusHistory.push(newStatus); // Add to history
 
         emit DocumentSigned(docId, newStatus, msg.sender, hash, block.timestamp);
     }
 
-    function rejectDocument(string memory docId) external docExists(docId) {
-        require(documents[docId].status != Status.Rejected, "Document already rejected");
+    function rejectDocument(string memory docId, string memory reason) external docExists(docId) {
+        // Allow rejection from Submitted, AccountingApproved, LegalApproved, RectorApproved
+        require(
+            documents[docId].status == Status.Submitted ||
+            documents[docId].status == Status.AccountingApproved ||
+            documents[docId].status == Status.LegalApproved ||
+            documents[docId].status == Status.RectorApproved,
+            "Can only reject from a valid approval or submitted status"
+        );
+        require(
+            documents[docId].status != Status.Rejected,
+            "Document already rejected"
+        );
         documents[docId].previousStatus = documents[docId].status;
         documents[docId].status = Status.Rejected;
-        documents[docId].approvers.push(msg.sender);
         documents[docId].timestamps[Status.Rejected] = block.timestamp;
+        documents[docId].statusHistory.push(Status.Rejected);
+        documents[docId].approvers.push(msg.sender);
+        documents[docId].rejectionReason = reason;
         emit DocumentRejected(docId, msg.sender, block.timestamp);
     }
 
     function revertToPreviousStatus(string memory docId) external docExists(docId) {
-        require(documents[docId].status == Status.Rejected, "Can only revert from Rejected status");
         require(
-            documents[docId].previousStatus == Status.AccountingApproved ||
-            documents[docId].previousStatus == Status.LegalApproved,
+            documents[docId].status == Status.Rejected,
+            "Can only revert from Rejected status"
+        );
+        uint len = documents[docId].statusHistory.length;
+        require(len >= 3, "Not enough history to revert two steps");
+        // Go back two steps (before rejection and before previous approval)
+        Status revertTo = documents[docId].statusHistory[len - 3];
+        // Only allow revert if the previous status is an approval (not Submitted)
+        require(
+            revertTo == Status.AccountingApproved ||
+            revertTo == Status.LegalApproved,
             "Can only revert to an approval status"
         );
-        Status prev = documents[docId].previousStatus;
-        documents[docId].status = prev;
-        documents[docId].timestamps[prev] = block.timestamp;
-        // Optionally, clear previousStatus or keep for audit
+        documents[docId].status = revertTo;
+        documents[docId].timestamps[revertTo] = block.timestamp;
+        documents[docId].statusHistory.push(revertTo); // Add to history
+        // Optionally, keep previousStatus for audit
     }
 
     function verifyDocument(string memory docId, uint8 requestedStatus, bytes32 submittedHash) public view returns (bool isValid, bool isPartial, string memory message)
@@ -131,5 +156,14 @@ contract DocumentNotary {
 
     function getDocumentApprovers(string memory docId) external view docExists(docId) returns (address[] memory) {
         return documents[docId].approvers;
+    }
+
+    function getRejectionReason(string memory docId) external view docExists(docId) returns (string memory) {
+        return documents[docId].rejectionReason;
+    }
+
+    // Add a function to get the full status history
+    function getStatusHistory(string memory docId) external view docExists(docId) returns (Status[] memory) {
+        return documents[docId].statusHistory;
     }
 }

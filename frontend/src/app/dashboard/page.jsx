@@ -11,6 +11,13 @@ const departmentStatus = {
   Rector: 'LegalApproved', // Rector sees documents in 'LegalApproved' state
 };
 
+// Helper: Map status to department
+const statusToDepartment = {
+  AccountingApproved: 'Accounting',
+  LegalApproved: 'Legal',
+  RectorApproved: 'Rector',
+};
+
 export default function DashboardPage() {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -40,9 +47,107 @@ export default function DashboardPage() {
     setSelectedHistory(null);
   };
 
+  // Helper: Check if a document was approved by Accounting and then rejected by Legal
+  const isRejectedAfterAccounting = (doc) => {
+    if (!doc.history || doc.history.length < 2) return false;
+    // Find last Accounting approval
+    const accountingApproval = doc.history.find(h => h.status === 'AccountingApproved');
+    // Find last rejection
+    const lastRejection = doc.history.filter(h => h.status === 'Rejected').pop();
+    // Find who rejected (Legal or Rector)
+    if (accountingApproval && lastRejection) {
+      // If rejection happened after accounting approval
+      const accountingIdx = doc.history.findIndex(h => h === accountingApproval);
+      const rejectionIdx = doc.history.findIndex(h => h === lastRejection);
+      // Only if rejected after accounting approval and not by accounting
+      if (rejectionIdx > accountingIdx && lastRejection.author !== accountingApproval.author) {
+        // Optionally, check if rejection was by Legal
+        return lastRejection;
+      }
+    }
+    return false;
+  };
+
+  // Helper: Find the last approval before rejection
+  const getLastApprovalBeforeRejection = (doc) => {
+    if (!doc.history || doc.history.length < 2) return null;
+    const lastRejectionIdx = [...doc.history].reverse().findIndex(h => h.status === 'Rejected');
+    if (lastRejectionIdx === -1) return null;
+    const rejectionIdx = doc.history.length - 1 - lastRejectionIdx;
+    for (let i = rejectionIdx - 1; i >= 0; i--) {
+      if (["AccountingApproved", "LegalApproved", "RectorApproved"].includes(doc.history[i].status)) {
+        return doc.history[i];
+      }
+    }
+    return null;
+  };
+
+  // Helper: Check if a document was reverted after rejection
+  const isRevertedAfterRejection = (doc) => {
+    if (!doc.history || doc.history.length < 2) return false;
+    // Find the last rejection
+    const lastRejectionIdx = [...doc.history].reverse().findIndex(h => h.status === 'Rejected');
+    if (lastRejectionIdx === -1) return false;
+    const rejectionIdx = doc.history.length - 1 - lastRejectionIdx;
+    // Check if there is a revert after rejection
+    for (let i = rejectionIdx + 1; i < doc.history.length; i++) {
+      if (["AccountingApproved", "LegalApproved", "RectorApproved"].includes(doc.history[i].status)) {
+        return doc.history[i].status;
+      }
+    }
+    return false;
+  };
+
+  // Helper: Get the next status for signing based on current status
+  const getNextStatus = (doc) => {
+    switch (doc.status) {
+      case 'Submitted':
+        return 'AccountingApproved';
+      case 'AccountingApproved':
+        return 'LegalApproved';
+      case 'LegalApproved':
+        return 'RectorApproved';
+      case 'Rejected': {
+        // Find the last approval before rejection
+        if (!doc.history || doc.history.length < 2) return '';
+        const lastRejectionIdx = [...doc.history].reverse().findIndex(h => h.status === 'Rejected');
+        if (lastRejectionIdx === -1) return '';
+        const rejectionIdx = doc.history.length - 1 - lastRejectionIdx;
+        for (let i = rejectionIdx - 1; i >= 0; i--) {
+          if (["AccountingApproved", "LegalApproved", "RectorApproved"].includes(doc.history[i].status)) {
+            return doc.history[i].status;
+          }
+        }
+        return '';
+      }
+      default:
+        return '';
+    }
+  };
+
+  // Filter logic: show rejected docs to previous department and admin
   const filteredDocuments = department === 'Admin'
     ? documents
-    : documents.filter(doc => doc.currentStatus === departmentStatus[department]);
+    : documents.filter(doc => {
+        // Always show if in the department's active status
+        if (doc.status === departmentStatus[department]) return true;
+        // Show rejected docs ONLY if rejected by accounting and user is accounting
+        const lastRejection = doc.history && doc.history.length > 0 ? [...doc.history].reverse().find(h => h.status === 'Rejected') : null;
+        if (doc.status === 'Rejected') {
+          if (department === 'Accounting') {
+            if (lastRejection && lastRejection.department === 'Accounting') return true;
+            return false;
+          }
+          // For other departments, never show rejected docs
+          return false;
+        }
+        // Show if reverted after rejection and the revert was to this department (and still in that reverted state)
+        const revertedStatus = isRevertedAfterRejection(doc);
+        if (revertedStatus && statusToDepartment[revertedStatus] === department && doc.status === revertedStatus) {
+          return true;
+        }
+        return false;
+      });
 
   return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -83,10 +188,11 @@ export default function DashboardPage() {
                   <tbody>
                   {filteredDocuments.map(doc => {
                     const lastHistory = doc.history ? doc.history[doc.history.length - 1] : null;
+                    const rejectedInfo = department === 'Accounting' && doc.status === 'Rejected' ? isRejectedAfterAccounting(doc) : false;
                     return (
                         <tr key={doc._id} className="border-b border-gray-100 hover:bg-gray-50">
                           <td className="px-4 py-2 text-gray-900">{doc.name || doc.docId}</td>
-                          <td className="px-4 py-2 text-gray-900">{doc.currentStatus || doc.status}</td>
+                          <td className="px-4 py-2 text-gray-900">{doc.status}</td>
                           <td className="px-4 py-2 text-gray-900">{lastHistory ? new Date(lastHistory.timestamp).toLocaleString() : '-'}</td>
                           <td className="px-4 py-2">
                             <button onClick={() => openHistory(doc.history || [])}
@@ -94,7 +200,7 @@ export default function DashboardPage() {
                             </button>
                           </td>
                           <td className="px-4 py-2 flex gap-2">
-                            <Link href={{ pathname: '/sign', query: { docId: doc.docId, status: departmentStatus[department] } }}
+                            <Link href={`http://localhost:3000/sign?docId=${encodeURIComponent(doc.docId)}&status=${getNextStatus(doc)}`}
                                   className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium">
                               Sign
                             </Link>
@@ -105,6 +211,40 @@ export default function DashboardPage() {
                             >
                               Download
                             </a>
+                            {doc.status === 'Rejected' && (() => {
+                              // Only show revert button if the current user department matches the previous approval
+                              // Find the last approval before rejection
+                              const lastApproval = doc.history && doc.history.length > 1
+                                ? [...doc.history].reverse().find(h =>
+                                    h.status === 'AccountingApproved' ||
+                                    h.status === 'LegalApproved' ||
+                                    h.status === 'RectorApproved')
+                                : null;
+                              // Map status to department
+                              const statusToDepartment = {
+                                AccountingApproved: 'Accounting',
+                                LegalApproved: 'Legal',
+                                RectorApproved: 'Rector',
+                              };
+                              if (lastApproval && statusToDepartment[lastApproval.status] === department) {
+                                return (
+                                  <button
+                                    className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-sm font-medium"
+                                    onClick={async () => {
+                                      try {
+                                        await axios.post('http://localhost:5000/api/documents/revert', { docId: doc.docId });
+                                        fetchDocuments();
+                                      } catch (err) {
+                                        alert('Failed to revert document: ' + (err.response?.data?.error || err.message));
+                                      }
+                                    }}
+                                  >
+                                    Revert
+                                  </button>
+                                );
+                              }
+                              return null;
+                            })()}
                           </td>
                         </tr>
                     );
@@ -126,6 +266,7 @@ export default function DashboardPage() {
                       <th className="px-4 py-3 text-left text-gray-700">Status</th>
                       <th className="px-4 py-3 text-left text-gray-700">When</th>
                       <th className="px-4 py-3 text-left text-gray-700">Tx Link</th>
+                      <th className="px-4 py-3 text-left text-gray-700">Reason</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -134,15 +275,15 @@ export default function DashboardPage() {
                           <td className="px-4 py-3 text-gray-900">{h.author || '-'}</td>
                           <td className="px-4 py-3 text-gray-900">{h.status}</td>
                           <td className="px-4 py-3 text-gray-900">{h.timestamp ? new Date(h.timestamp).toLocaleString() : '-'}</td>
-                          <td className="px-4 py-3">{h.txHash ? (
-                              <a href={`${ETHERSCAN_BASE}${h.txHash}`} target="_blank" rel="noopener noreferrer"
-                                 className="text-blue-600 underline">
+                          <td className="px-4 py-3 text-gray-900">{h.txHash ? (
+                              <a href={`${ETHERSCAN_BASE}${h.txHash}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
                                 {h.txHash.slice(0, 10)}...
                               </a>
                           ) : '-'}</td>
+                          <td className="px-4 py-3 text-gray-900">{h.reason || '-'}</td>
                         </tr>
                     )) : <tr>
-                      <td colSpan={4} className="text-center py-3">No history</td>
+                      <td colSpan={5} className="text-center py-3">No history</td>
                     </tr>}
                     </tbody>
                   </table>

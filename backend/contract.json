@@ -1,5 +1,5 @@
 {
-  "address": "0x4BE5AF0dB8945dE0A901A21fAc17063Ef893e5BF",
+  "address": "0xe35dE5dca335e8ad597794e54Cf62eb700817639",
   "abi": [
     {
       "anonymous": false,
@@ -16,11 +16,11 @@
       "inputs": [
         { "indexed": false, "internalType": "string", "name": "docId", "type": "string" },
         { "indexed": false, "internalType": "enum DocumentNotary.Status", "name": "status", "type": "uint8" },
-        { "indexed": false, "internalType": "address", "name": "approver", "type": "address" },
+        { "indexed": false, "internalType": "address", "name": "signer", "type": "address" },
         { "indexed": false, "internalType": "bytes32", "name": "hash", "type": "bytes32" },
         { "indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256" }
       ],
-      "name": "DocumentStatusUpdated",
+      "name": "DocumentSigned",
       "type": "event"
     },
     {
@@ -72,6 +72,18 @@
       "inputs": [
         { "internalType": "string", "name": "docId", "type": "string" }
       ],
+      "name": "getRejectionReason",
+      "outputs": [
+        { "internalType": "string", "name": "", "type": "string" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "string", "name": "docId", "type": "string" },
+        { "internalType": "string", "name": "reason", "type": "string" }
+      ],
       "name": "rejectDocument",
       "outputs": [],
       "stateMutability": "nonpayable",
@@ -79,10 +91,9 @@
     },
     {
       "inputs": [
-        { "internalType": "string", "name": "docId", "type": "string" },
-        { "internalType": "bytes32", "name": "hash", "type": "bytes32" }
+        { "internalType": "string", "name": "docId", "type": "string" }
       ],
-      "name": "submitDocument",
+      "name": "revertToPreviousStatus",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -93,7 +104,17 @@
         { "internalType": "enum DocumentNotary.Status", "name": "newStatus", "type": "uint8" },
         { "internalType": "bytes32", "name": "hash", "type": "bytes32" }
       ],
-      "name": "updateStatus",
+      "name": "signDocument",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "string", "name": "docId", "type": "string" },
+        { "internalType": "bytes32", "name": "hash", "type": "bytes32" }
+      ],
+      "name": "submitDocument",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
