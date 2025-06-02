@@ -35,6 +35,18 @@ function SignPageContent() {
         RectorApproved: 3,
     };
 
+    // Helper to get the previous department based on the current status
+    const getPrecedingDepartment = (status) => {
+        switch (status) {
+            case 'AccountingApproved':
+                return 'Submission';
+            case 'LegalApproved':
+                return 'Accounting Department';
+            case 'RectorApproved':
+                return 'Legal Department';
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -88,7 +100,19 @@ function SignPageContent() {
             setFile(null);
         } catch (err) {
             console.error(err);
-            setMessage(`❌ Error: ${err.response?.data?.error || err.message}`);
+            // Custom error handling for MetaMask user rejection
+            if (
+                err.code === 4001 ||
+                (err.error && err.error.code === 4001) ||
+                (err.message && (
+                    err.message.includes('user rejected action') ||
+                    err.message.includes('User denied transaction signature')
+                ))
+            ) {
+                setMessage(`You have canceled the process to sign a document from the ${getPrecedingDepartment(status)}, please try again!`);
+            } else {
+                setMessage(`❌ Error: ${err.response?.data?.error || err.message}`);
+            }
         } finally {
             setLoading(false);
         }
