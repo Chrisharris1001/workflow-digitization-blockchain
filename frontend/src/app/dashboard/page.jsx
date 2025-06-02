@@ -196,7 +196,7 @@ export default function DashboardPage() {
                           <td className="px-4 py-2 text-gray-900">{lastHistory ? new Date(lastHistory.timestamp).toLocaleString() : '-'}</td>
                           <td className="px-4 py-2">
                             <button onClick={() => openHistory(doc.history || [])}
-                                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">View
+                                    className="px-3 py-1 bg-black hover:bg-gray-900 text-white rounded-lg text-sm font-medium">View
                             </button>
                           </td>
                           <td className="px-4 py-2 flex gap-2">

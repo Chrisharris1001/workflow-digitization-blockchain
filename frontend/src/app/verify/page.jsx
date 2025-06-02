@@ -80,14 +80,13 @@ export default function VerifyPage() {
 
                     <button
                         type="submit"
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg"
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg"
                     >
-                        Verify Document
+                        Verify document
                     </button>
                 </form>
 
-                <Link href="/dashboard" className="mt-4 w-full inline-block text-center bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg">Go to dashboard</Link>
-
+                <Link href="/dashboard" className="mt-4 w-full inline-block text-center bg-amber-700 hover:bg-amber-800 text-white font-semibold py-2 px-4 rounded-lg">Go to dashboard</Link>
                 {result && (
                     <div
                         className={`mt-4 text-sm px-4 py-2 rounded max-h-40 overflow-auto whitespace-pre-wrap break-words ${

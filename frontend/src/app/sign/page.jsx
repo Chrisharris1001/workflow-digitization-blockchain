@@ -190,7 +190,7 @@ function SignPageContent() {
                     <div className="flex gap-4">
                         <button
                             type="submit"
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg"
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg"
                             disabled={loading}
                         >
                             Sign
@@ -205,7 +205,7 @@ function SignPageContent() {
                         </button>
                     </div>
                 </form>
-                <Link href="/verify" className="mt-4 w-full inline-block text-center bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg">Go to Verify Page</Link>
+                <Link href="/verify" className="mt-4 w-full inline-block text-center bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold py-2 px-4 rounded-lg">Go to verify page</Link>
                 {message && (
                     <div
                         className={`mt-4 text-sm px-4 py-2 rounded max-h-40 overflow-auto whitespace-pre-wrap break-words ${
