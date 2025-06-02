@@ -174,8 +174,8 @@ export default function DashboardPage() {
             </div>
           </div>
           {loading ? <p className="text-gray-600">Loading...</p> : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full border border-gray-200 rounded-lg">
+              <div className="overflow-auto max-h-[60vh]">
+                <table className="min-w-full border border-gray-200 rounded-lg table-fixed">
                   <thead className="bg-gray-100">
                   <tr>
                     <th className="px-4 py-2 text-left text-gray-700">Name</th>
@@ -271,9 +271,9 @@ export default function DashboardPage() {
         </div>
         {showHistory && (
             <div className="fixed inset-0 flex items-center justify-center bg-gray-200 bg-opacity-80 z-50">
-              <div className="bg-white p-12 rounded-2xl shadow-2xl min-w-[600px] max-w-2xl w-full">
+              <div className="bg-white p-12 rounded-2xl shadow-2xl min-w-[320px] max-w-6xl w-full max-h-[95vh]">
                 <h2 className="text-3xl font-semibold text-gray-800 mb-6">Approval History</h2>
-                <div className="overflow-x-auto">
+                <div className="overflow-auto max-h-[85vh]">
                   <table className="min-w-full border border-gray-200 rounded-lg">
                     <thead className="bg-gray-100">
                     <tr>
@@ -286,24 +286,30 @@ export default function DashboardPage() {
                     </thead>
                     <tbody>
                     {selectedHistory && selectedHistory.length > 0 ? selectedHistory.map((h, idx) => (
-                        <tr key={idx} className="border-b border-gray-100">
-                          <td className="px-4 py-3 text-gray-900">{h.author || '-'}</td>
-                          <td className="px-4 py-3 text-gray-900">{h.status}</td>
-                          <td className="px-4 py-3 text-gray-900">{h.timestamp ? new Date(h.timestamp).toLocaleString() : '-'}</td>
-                          <td className="px-4 py-3 text-gray-900">{h.txHash ? (
-                              <a href={`${ETHERSCAN_BASE}${h.txHash}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
-                                {h.txHash.slice(0, 10)}...
-                              </a>
-                          ) : '-'}</td>
-                          <td className="px-4 py-3 text-gray-900">{h.reason || '-'}</td>
-                        </tr>
+                      <tr key={idx} className="border-b border-gray-100 align-top">
+                        <td className="px-4 py-3 text-gray-900 align-top">
+                          {h.author && h.author.length > 12
+                            ? `${h.author.slice(0, 7)}...${h.author.slice(-6)}`
+                            : (h.author || '-')}
+                        </td>
+                        <td className="px-4 py-3 text-gray-900 break-all whitespace-normal min-w-[120px] max-w-[180px] align-top">{h.status}</td>
+                        <td className="px-4 py-3 text-gray-900 break-all whitespace-normal min-w-[120px] max-w-[180px] align-top">{h.timestamp ? new Date(h.timestamp).toLocaleString() : '-'}</td>
+                        <td className="px-4 py-3 text-gray-900 whitespace-nowrap align-top">
+                          {h.txHash ? (
+                            <a href={`${ETHERSCAN_BASE}${h.txHash}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                              {h.txHash.slice(0, 10)}...
+                            </a>
+                          ) : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-gray-900 break-all whitespace-normal min-w-[220px] max-w-[400px] align-top">{h.reason || '-'}</td>
+                      </tr>
                     )) : <tr>
                       <td colSpan={5} className="text-center py-3">No history</td>
                     </tr>}
                     </tbody>
                   </table>
                 </div>
-                <button className="mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg w-full"
+                <button className="mt-6 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded w-full text-sm font-medium"
                         onClick={closeHistory}>Close
                 </button>
               </div>
