@@ -211,6 +211,21 @@ export default function DashboardPage() {
                             >
                               Download
                             </a>
+                            <button
+                              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium"
+                              onClick={async () => {
+                                if (window.confirm('Are you sure you want to delete this document?')) {
+                                  try {
+                                    await axios.delete(`http://localhost:5000/api/documents/delete/${encodeURIComponent(doc.docId)}`);
+                                    fetchDocuments();
+                                  } catch (err) {
+                                    alert('Failed to delete document: ' + (err.response?.data?.error || err.message));
+                                  }
+                                }
+                              }}
+                            >
+                              Delete
+                            </button>
                             {doc.status === 'Rejected' && (() => {
                               // Only show revert button if the current user department matches the previous approval
                               // Find the last approval before rejection

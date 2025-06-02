@@ -293,4 +293,22 @@ router.get('/dashboard', async (req, res) => {
     }
 });
 
+// Delete a document by docId
+router.delete('/delete/:docId', async (req, res) => {
+    try {
+        const { docId } = req.params;
+        if (!docId) {
+            return res.status(400).json({ error: 'docId is required.' });
+        }
+        const deleted = await Document.findOneAndDelete({ docId });
+        if (!deleted) {
+            return res.status(404).json({ error: 'Document not found.' });
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to delete document.' });
+    }
+});
+
 module.exports = router;
