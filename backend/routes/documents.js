@@ -4,13 +4,20 @@ const multer = require('multer');
 const fs = require('fs');
 const pdfParse = require('pdf-parse');
 const { InfuraProvider, Wallet, Contract, keccak256 } = require('ethers');
+const path = require('path');
 require('dotenv').config();
 
 const Document = require('../models/Document');
 const contractJson = require('../contract.json');
 const documentController = require('../controllers/documentController');
 
-const upload = multer({ dest: 'uploads/' });
+// Ensure uploads directory exists
+const uploadDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+const upload = multer({ dest: uploadDir });
+
 const contractAddress = '0xc4122C5209441A1a11140ebC8d1671E525662445';
 
 const provider = new InfuraProvider('sepolia', process.env.INFURA_API_KEY);
