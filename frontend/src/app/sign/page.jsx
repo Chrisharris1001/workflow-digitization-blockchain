@@ -7,7 +7,7 @@ import contractJSON from '../contract.json';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
-const CONTRACT_ADDRESS = '0xe35dE5dca335e8ad597794e54Cf62eb700817639';
+const CONTRACT_ADDRESS = '0xc4122C5209441A1a11140ebC8d1671E525662445';
 const CONTRACT_ABI = contractJSON.abi;
 
 export default function SignPage() {
@@ -54,16 +54,21 @@ function SignPageContent() {
             setMessage('⚠️ Document ID is required to reject.');
             return;
         }
+        const reason = window.prompt('Please provide a reason for rejection:');
+        if (!reason) {
+            setMessage('⚠️ Rejection reason is required.');
+            return;
+        }
         setLoading(true);
         setMessage('Rejecting document...');
         try {
-            // Call backend to reject the document
+            // Call backend to reject the document, passing the reason
             const res = await axios.post('http://localhost:5000/api/documents/reject', {
                 docId,
-                status: 'Rejected',
-                reason: `Rejected by user from Accounting`
+                reason,
+                department: status === 'AccountingApproved' ? 'Accounting' : status === 'LegalApproved' ? 'Legal' : status === 'RectorApproved' ? 'Rector' : ''
             });
-            setMessage(`❌ Document rejected. Reason: ${res.data.reason || 'No reason provided.'}`);
+            setMessage(`❌ Document rejected. Reason: ${reason}`);
             setDocId('');
             setStatus('AccountingApproved');
             setFile(null);

@@ -8,9 +8,10 @@ require('dotenv').config();
 
 const Document = require('../models/Document');
 const contractJson = require('../contract.json');
+const documentController = require('../controllers/documentController');
 
 const upload = multer({ dest: 'uploads/' });
-const contractAddress = '0xe35dE5dca335e8ad597794e54Cf62eb700817639';
+const contractAddress = '0xc4122C5209441A1a11140ebC8d1671E525662445';
 
 const provider = new InfuraProvider('sepolia', process.env.INFURA_API_KEY);
 const wallet = new Wallet(process.env.PRIVATE_KEY, provider);
@@ -216,31 +217,34 @@ router.post('/update-document', async (req, res) => {
 
 router.post('/reject', async (req, res) => {
     try {
-        const { docId, status, reason } = req.body;
+        const {docId, reason, department} = req.body;
         if (!docId) {
-            return res.status(400).json({ error: 'docId is required.' });
+            return res.status(400).json({error: 'docId is required.'});
+        }
+
+        // Find the document to get its current status
+        const doc = await Document.findOne({docId});
+        if (!doc) {
+            return res.status(404).json({error: 'Document not found.'});
+        }
+
+        // Only allow rejection if the department matches the current status
+        const statusToDepartment = {
+            Submitted: 'Accounting',
+            AccountingApproved: 'Legal',
+            LegalApproved: 'Rector',
+        };
+        const allowedDepartment = statusToDepartment[doc.status];
+        if (department !== allowedDepartment) {
+            return res.status(403).json({error: `Only the ${allowedDepartment} department can reject at this stage.`});
         }
 
         // Always set status to 'Rejected' for any department
         const tx = await contract.rejectDocument(docId, reason || 'Rejected');
         await tx.wait();
 
-        // Find the document to get its current status
-        const doc = await Document.findOne({ docId });
-        if (!doc) {
-            return res.status(404).json({ error: 'Document not found.' });
-        }
-
         // Always set newStatus to 'Rejected'
         let newStatus = 'Rejected';
-        let revertHistory = null;
-
-        // Determine department (for now, hardcoded to Accounting, but should be dynamic in a real app)
-        let department = 'Accounting';
-        // If you have department info in the request/session, use that instead
-        if (req.body.department) {
-            department = req.body.department;
-        }
 
         // Add department to history for rejection
         const historyEntry = {
@@ -263,11 +267,8 @@ router.post('/reject', async (req, res) => {
                     timestamp: new Date(),
                 },
             },
-            $push: { history: historyEntry },
+            $push: {history: historyEntry},
         };
-        if (revertHistory) {
-            updateOps.$push.history = revertHistory;
-        }
         const updated = await Document.findOneAndUpdate(
             { docId },
             updateOps,
@@ -276,39 +277,86 @@ router.post('/reject', async (req, res) => {
         if (!updated) {
             return res.status(404).json({ error: 'Document not found.' });
         }
-        res.json({ success: true, document: updated });
+        res.json({ success: true, document: updated, reason });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to update document status.' });
     }
 });
 
-// Get all documents for dashboard (Admin sees all, others filter on frontend)
+router.post('/revert', async (req, res) => {
+    try {
+        const { docId } = req.body;
+        if (!docId) {
+            return res.status(400).json({ error: 'docId is required.' });
+        }
+
+        const doc = await Document.findOne({ docId });
+        if (!doc) {
+            return res.status(404).json({ error: 'Document not found.' });
+        }
+
+        // Only allow revert from approval statuses or if rejected
+        const approvalStatuses = ['AccountingApproved', 'LegalApproved', 'RectorApproved', 'Rejected'];
+        if (!approvalStatuses.includes(doc.status)) {
+            return res.status(400).json({ error: 'Can only revert from an approval or rejected status.' });
+        }
+
+        // Call the smart contract revert function (corrected function name)
+        const tx = await contract.revertToPreviousStatus(docId);
+        await tx.wait();
+
+        // Find the previous status from history
+        let previousStatus = 'Submitted'; // fallback if no previous status
+        if (doc.history && doc.history.length > 0) {
+            // Find the last status that is different from the current one
+            for (let i = doc.history.length - 1; i >= 0; i--) {
+                if (doc.history[i].status !== doc.status) {
+                    previousStatus = doc.history[i].status;
+                    break;
+                }
+            }
+        }
+        const newStatus = previousStatus;
+        const historyEntry = {
+            status: newStatus,
+            action: 'Reverted',
+            timestamp: new Date(),
+            txHash: tx.hash,
+            author: wallet.address
+        };
+
+        // Update the document in the database
+        const updated = await Document.findOneAndUpdate(
+            { docId },
+            {
+                $set: { status: newStatus, timestamp: new Date() },
+                $push: { history: historyEntry }
+            },
+            { new: true }
+        );
+        if (!updated) {
+            return res.status(404).json({ error: 'Document not found after revert.' });
+        }
+        res.json({ success: true, document: updated });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.reason || err.message || 'Failed to revert document.' });
+    }
+});
+
+// Get all documents for dashboard
 router.get('/dashboard', async (req, res) => {
     try {
-        const docs = await Document.find({}).sort({ timestamp: -1 });
+        const docs = await Document.find({});
         res.json(docs);
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch documents for dashboard.' });
     }
 });
 
-// Delete a document by docId
-router.delete('/delete/:docId', async (req, res) => {
-    try {
-        const { docId } = req.params;
-        if (!docId) {
-            return res.status(400).json({ error: 'docId is required.' });
-        }
-        const deleted = await Document.findOneAndDelete({ docId });
-        if (!deleted) {
-            return res.status(404).json({ error: 'Document not found.' });
-        }
-        res.json({ success: true });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Failed to delete document.' });
-    }
-});
+// Add this route for downloading documents by filename
+router.get('/download/:filename', documentController.downloadDocument);
 
 module.exports = router;
+

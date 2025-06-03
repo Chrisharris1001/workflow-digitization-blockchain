@@ -91,19 +91,25 @@ contract DocumentNotary {
             "Can only revert from Rejected status"
         );
         uint len = documents[docId].statusHistory.length;
-        require(len >= 3, "Not enough history to revert two steps");
-        // Go back two steps (before rejection and before previous approval)
-        Status revertTo = documents[docId].statusHistory[len - 3];
-        // Only allow revert if the previous status is an approval (not Submitted)
-        require(
-            revertTo == Status.AccountingApproved ||
-            revertTo == Status.LegalApproved,
-            "Can only revert to an approval status"
-        );
+        require(len >= 2, "Not enough history to revert");
+        // Find the last approval status before the most recent rejection
+        int lastApprovalIdx = -1;
+        for (int i = int(len) - 2; i >= 0; i--) {
+            Status s = documents[docId].statusHistory[uint(i)];
+            if (
+                s == Status.AccountingApproved ||
+                s == Status.LegalApproved ||
+                s == Status.RectorApproved
+            ) {
+                lastApprovalIdx = i;
+                break;
+            }
+        }
+        require(lastApprovalIdx >= 0, "No previous approval status to revert to");
+        Status revertTo = documents[docId].statusHistory[uint(lastApprovalIdx)];
         documents[docId].status = revertTo;
         documents[docId].timestamps[revertTo] = block.timestamp;
         documents[docId].statusHistory.push(revertTo); // Add to history
-        // Optionally, keep previousStatus for audit
     }
 
     function verifyDocument(string memory docId, uint8 requestedStatus, bytes32 submittedHash) public view returns (bool isValid, bool isPartial, string memory message)
