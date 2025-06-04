@@ -17,7 +17,7 @@ contract DocumentNotary {
     mapping(string => Document) private documents;
 
     event DocumentSubmitted(string docId, address sender, bytes32 hash, uint256 timestamp);
-    event DocumentRejected(string docId, address rejectedBy, uint256 timestamp);
+    event DocumentRejected(string docId, address rejectedBy, bytes32 hash, uint256 timestamp);
     event DocumentSigned(string docId, Status status, address signer, bytes32 hash, uint256 timestamp);
 
     modifier docExists(string memory docId) {
@@ -62,8 +62,7 @@ contract DocumentNotary {
         emit DocumentSigned(docId, newStatus, msg.sender, hash, block.timestamp);
     }
 
-    function rejectDocument(string memory docId) external docExists(docId) {
-        // Allow rejection from Submitted, AccountingApproved, LegalApproved, RectorApproved
+    function rejectDocument(string memory docId, bytes32 hash) external docExists(docId) {
         require(
             documents[docId].status == Status.Submitted ||
             documents[docId].status == Status.AccountingApproved ||
@@ -77,10 +76,11 @@ contract DocumentNotary {
         );
         documents[docId].previousStatus = documents[docId].status;
         documents[docId].status = Status.Rejected;
+        documents[docId].hash = hash;
         documents[docId].timestamps[Status.Rejected] = block.timestamp;
         documents[docId].statusHistory.push(Status.Rejected);
         documents[docId].approvers.push(msg.sender);
-        emit DocumentRejected(docId, msg.sender, block.timestamp);
+        emit DocumentRejected(docId, msg.sender, hash, block.timestamp);
     }
 
     function revertToPreviousStatus(string memory docId) external docExists(docId) {

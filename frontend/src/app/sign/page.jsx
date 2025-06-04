@@ -7,7 +7,7 @@ import contractJSON from '../contract.json';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
-const CONTRACT_ADDRESS = '0xc4122C5209441A1a11140ebC8d1671E525662445';
+const CONTRACT_ADDRESS = '0xBADFe18893763645bF24d8d34C62D48495Bb414A';
 const CONTRACT_ABI = contractJSON.abi;
 
 export default function SignPage() {
@@ -50,19 +50,95 @@ function SignPageContent() {
     // Handler for rejecting a document
     const handleReject = async (e) => {
         e.preventDefault();
-        if (!docId) {
-            setMessage('⚠️ Document ID is required to reject.');
+        if (!docId || !file) {
+            setMessage('⚠️ Document ID and file are required to reject.');
             return;
         }
         setLoading(true);
-        setMessage('Rejecting document...');
+        setMessage('Validating document for rejection...');
         try {
-            // Call backend to reject the document
-            const res = await axios.post('http://localhost:5000/api/documents/reject', {
+            // Step 1: Validate and get hash from backend (send current status for hash validation)
+            // Fetch the current status from the contract first
+            if (!window.ethereum) {
+                setMessage('❌ Please install MetaMask to reject documents.');
+                setLoading(false);
+                return;
+            }
+            await window.ethereum.request({ method: 'eth_requestAccounts' });
+            const provider = new BrowserProvider(window.ethereum);
+            const signer = await provider.getSigner();
+            const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+            const currentStatus = await contract.getDocumentStatus(docId);
+            // Map contract status to status string for backend
+            const statusNumToString = {
+                0: 'AccountingApproved', // For rejection, we want to use the next status as in sign logic
+                1: 'LegalApproved',
+                2: 'RectorApproved',
+                3: 'RectorApproved', // Already fully approved, should not be rejected
+                4: 'Rejected'
+            };
+            const backendStatus = statusNumToString[Number(currentStatus)];
+            if (!backendStatus || Number(currentStatus) > 2) {
+                setMessage('❌ Cannot reject: Invalid or final status.');
+                setLoading(false);
+                return;
+            }
+
+            // Get hash from backend using the current status
+            const formData = new FormData();
+            formData.append('docId', docId);
+            formData.append('status', backendStatus);
+            formData.append('document', file);
+            const res = await axios.post('http://localhost:5000/api/documents/sign', formData);
+            const hash = res.data.hash;
+
+            // Step 2: Check if document exists and hash matches on-chain (same as sign logic)
+            const verifyResult = await contract.verifyDocument(docId, Number(currentStatus), hash);
+            if (!verifyResult[0] && verifyResult[2] === 'Document not found') {
+                setMessage('❌ Cannot reject: Document was not submitted.');
+                setLoading(false);
+                return;
+            }
+            if (!verifyResult[0] && verifyResult[2] === 'Hash mismatch') {
+                setMessage('❌ Cannot reject: Hash mismatch with submitted document.');
+                setLoading(false);
+                return;
+            }
+
+            // Map contract status to department for backend
+            const statusToDepartment = {
+                0: 'Accounting', // Submitted
+                1: 'Legal',      // AccountingApproved
+                2: 'Rector',     // LegalApproved
+                3: '',           // RectorApproved (should not be rejected by anyone else)
+                4: ''            // Rejected
+            };
+            const department = statusToDepartment[Number(currentStatus)];
+            if (!department) {
+                setMessage('❌ Cannot reject: Invalid department for current status.');
+                setLoading(false);
+                return;
+            }
+
+            // Step 3: Call smart contract to reject the document (MetaMask interaction)
+            try {
+                const tx = await contract.rejectDocument(docId, hash);
+                setMessage('⏳ Waiting for transaction confirmation...');
+                await tx.wait();
+            } catch (err) {
+                setMessage(`❌ MetaMask transaction failed: ${err.message}`);
+                setLoading(false);
+                return;
+            }
+
+            // Step 4: Call backend to reject the document
+            await axios.post('http://localhost:5000/api/documents/reject', {
                 docId,
-                department: status === 'AccountingApproved' ? 'Accounting' : status === 'LegalApproved' ? 'Legal' : status === 'RectorApproved' ? 'Rector' : ''
+                hash,
+                department
             });
-            setMessage(`❌ Document rejected!`);
+            setMessage(`❌ Document rejected and recorded on blockchain!`);
             setDocId('');
             setStatus('AccountingApproved');
             setFile(null);
@@ -93,9 +169,9 @@ function SignPageContent() {
             // Step 1: Validate and get hash from backend
             const res = await axios.post('http://localhost:5000/api/documents/sign', formData);
             const hash = res.data.hash;
-            setMessage('Validation passed. Waiting for MetaMask signature...');
 
-            // Step 2: Call smart contract via MetaMask
+            // Step 2: Check if document exists and hash matches on-chain
+            setMessage('Verifying document existence and hash on-chain...');
             if (!window.ethereum) {
                 setMessage('❌ Please install MetaMask to sign documents.');
                 setLoading(false);
@@ -105,6 +181,28 @@ function SignPageContent() {
             const provider = new BrowserProvider(window.ethereum);
             const signer = await provider.getSigner();
             const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+            // Call verifyDocument on-chain
+            const verifyResult = await contract.verifyDocument(docId, statusEnum[status], hash);
+            // verifyResult is a tuple: [isValid, isPartial, message]
+            // Allow signing if document is only submitted and user is trying to sign for AccountingApproved
+            if (!verifyResult[0]) {
+                if (
+                    status === 'AccountingApproved' &&
+                    verifyResult[2] === 'Document is only submitted, not yet approved.'
+                ) {
+                    // Allow signing for AccountingApproved
+                    // No error, continue
+                } else {
+                    setMessage(`❌ Cannot sign: ${verifyResult[2]}`);
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            setMessage('Validation passed. Waiting for MetaMask signature...');
+
+            // Step 3: Call smart contract via MetaMask
             const tx = await contract.signDocument(docId, statusEnum[status], hash);
             await tx.wait();
 

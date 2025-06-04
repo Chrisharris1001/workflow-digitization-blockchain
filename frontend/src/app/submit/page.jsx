@@ -5,28 +5,25 @@ import Link from "next/link";
 
 export default function SubmitPage() {
     const [docId, setDocId] = useState('');
-    const [name, setName] = useState('');
     const [file, setFile] = useState(null);
     const [status, setStatus] = useState('');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!docId || !name || !file) {
+        if (!docId || !file) {
             setStatus('⚠️ All fields are required.');
             return;
         }
 
         const formData = new FormData();
         formData.append('docId', docId);
-        formData.append('name', name);
         formData.append('document', file);
 
         try {
             const res = await axios.post('http://localhost:5000/api/documents/submit-doc', formData);
             setStatus(`✅ Success! Tx: ${res.data.txHash}`);
             setDocId('');
-            setName('');
             setFile(null);
         } catch (err) {
             console.error(err);
@@ -44,13 +41,6 @@ export default function SubmitPage() {
                         placeholder="Document ID (e.g., TRIP-001)"
                         value={docId}
                         onChange={(e) => setDocId(e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400"
-                    />
-                    <input
-                        type="text"
-                        placeholder="Document Name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
                         className="w-full p-3 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400"
                     />
                     <div>

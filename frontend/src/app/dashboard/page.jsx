@@ -227,21 +227,24 @@ export default function DashboardPage() {
                             >
                               Download
                             </a>
-                            <button
-                              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium"
-                              onClick={async () => {
-                                if (window.confirm('Are you sure you want to delete this document?')) {
-                                  try {
-                                    await axios.delete(`http://localhost:5000/api/documents/delete/${encodeURIComponent(doc.docId)}`);
-                                    fetchDocuments();
-                                  } catch (err) {
-                                    alert('Failed to delete document: ' + (err.response?.data?.error || err.message));
+                            {/* Only Admin can see the Delete button */}
+                            {department === 'Admin' && (
+                              <button
+                                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium"
+                                onClick={async () => {
+                                  if (window.confirm('Are you sure you want to delete this document?')) {
+                                    try {
+                                      await axios.delete(`http://localhost:5000/api/documents/delete/${encodeURIComponent(doc.docId)}`);
+                                      fetchDocuments();
+                                    } catch (err) {
+                                      alert('Failed to delete document: ' + (err.response?.data?.error || err.message));
+                                    }
                                   }
-                                }
-                              }}
-                            >
-                              Delete
-                            </button>
+                                }}
+                              >
+                                Delete
+                              </button>
+                            )}
                             {/* Show Revert button only if document is rejected (not submitted) and this department last approved, or if admin */}
                             {doc.status === 'Rejected' && doc.status !== 'Submitted' && ((department === 'Admin') || (() => {
                               const lastApproval = doc.history && doc.history.length > 1

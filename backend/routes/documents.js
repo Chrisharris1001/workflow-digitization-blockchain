@@ -18,7 +18,7 @@ if (!fs.existsSync(uploadDir)) {
 }
 const upload = multer({ dest: uploadDir });
 
-const contractAddress = '0xc4122C5209441A1a11140ebC8d1671E525662445';
+const contractAddress = '0xBADFe18893763645bF24d8d34C62D48495Bb414A';
 
 const provider = new InfuraProvider('sepolia', process.env.INFURA_API_KEY);
 const wallet = new Wallet(process.env.PRIVATE_KEY, provider);
@@ -224,9 +224,9 @@ router.post('/update-document', async (req, res) => {
 
 router.post('/reject', async (req, res) => {
     try {
-        const {docId, reason, department} = req.body;
-        if (!docId) {
-            return res.status(400).json({error: 'docId is required.'});
+        const {docId, hash, department} = req.body;
+        if (!docId || !hash) {
+            return res.status(400).json({error: 'docId and hash are required.'});
         }
 
         // Find the document to get its current status
@@ -246,8 +246,17 @@ router.post('/reject', async (req, res) => {
             return res.status(403).json({error: `Only the ${allowedDepartment} department can reject at this stage.`});
         }
 
+        // On-chain hash verification (strict)
+        const onChainHash = await contract.callStatic["documents"](docId).then(d => d.hash);
+        if (!onChainHash || onChainHash === '0x' || onChainHash === '0x0000000000000000000000000000000000000000000000000000000000000000') {
+            return res.status(404).json({error: 'Document not found on-chain.'});
+        }
+        if (onChainHash !== hash) {
+            return res.status(400).json({error: 'Hash mismatch with on-chain document.'});
+        }
+
         // Always set status to 'Rejected' for any department
-        const tx = await contract.rejectDocument(docId, reason || 'Rejected');
+        const tx = await contract.rejectDocument(docId, hash);
         await tx.wait();
 
         // Always set newStatus to 'Rejected'
@@ -256,7 +265,6 @@ router.post('/reject', async (req, res) => {
         // Add department to history for rejection
         const historyEntry = {
             status: newStatus,
-            reason: reason || 'Rejected',
             timestamp: new Date(),
             department,
             txHash: tx.hash,
@@ -270,7 +278,6 @@ router.post('/reject', async (req, res) => {
                 lastAction: {
                     action: 'Rejected',
                     department,
-                    reason: reason || 'Rejected',
                     timestamp: new Date(),
                 },
             },
@@ -284,7 +291,7 @@ router.post('/reject', async (req, res) => {
         if (!updated) {
             return res.status(404).json({ error: 'Document not found.' });
         }
-        res.json({ success: true, document: updated, reason });
+        res.json({ success: true, document: updated });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to update document status.' });
@@ -365,5 +372,31 @@ router.get('/dashboard', async (req, res) => {
 // Add this route for downloading documents by filename
 router.get('/download/:filename', documentController.downloadDocument);
 
-module.exports = router;
+// Delete a document by docId
+router.delete('/delete/:docId', async (req, res) => {
+    try {
+        const { docId } = req.params;
+        if (!docId) {
+            return res.status(400).json({ error: 'docId is required.' });
+        }
+        const doc = await Document.findOne({ docId });
+        if (!doc) {
+            return res.status(404).json({ error: 'Document not found.' });
+        }
+        // Remove file from uploads directory
+        if (doc.filename) {
+            const filePath = path.join(__dirname, '../uploads', doc.filename);
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+        }
+        // Remove from database
+        await Document.deleteOne({ docId });
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to delete document.' });
+    }
+});
 
+module.exports = router;
