@@ -54,21 +54,15 @@ function SignPageContent() {
             setMessage('⚠️ Document ID is required to reject.');
             return;
         }
-        const reason = window.prompt('Please provide a reason for rejection:');
-        if (!reason) {
-            setMessage('⚠️ Rejection reason is required.');
-            return;
-        }
         setLoading(true);
         setMessage('Rejecting document...');
         try {
-            // Call backend to reject the document, passing the reason
+            // Call backend to reject the document
             const res = await axios.post('http://localhost:5000/api/documents/reject', {
                 docId,
-                reason,
                 department: status === 'AccountingApproved' ? 'Accounting' : status === 'LegalApproved' ? 'Legal' : status === 'RectorApproved' ? 'Rector' : ''
             });
-            setMessage(`❌ Document rejected. Reason: ${reason}`);
+            setMessage(`❌ Document rejected!`);
             setDocId('');
             setStatus('AccountingApproved');
             setFile(null);
@@ -130,8 +124,6 @@ function SignPageContent() {
             setDocId('');
             setStatus('AccountingApproved');
             setFile(null);
-            // Redirect to dashboard to force refresh
-            // window.location.href = '/dashboard';
         } catch (err) {
             console.error(err);
             // Custom error handling for MetaMask user rejection

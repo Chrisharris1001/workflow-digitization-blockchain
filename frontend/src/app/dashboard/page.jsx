@@ -201,11 +201,7 @@ export default function DashboardPage() {
                           <td className="px-4 py-2 text-gray-900">{doc.name || doc.docId}</td>
                           <td className="px-4 py-2 text-gray-900">
                             {doc.status === 'Rejected' && doc.history && doc.history.length > 0 ? (
-                              <>
-                                <span className="font-bold text-red-700">Rejected</span>
-                                <br />
-                                <span className="text-sm text-yellow-900 bg-yellow-100 px-2 py-1 rounded">Reason: {doc.history[doc.history.length-1].reason || '-'}</span>
-                              </>
+                              <span className="font-bold text-red-700">Rejected</span>
                             ) : (
                               doc.status
                             )}
@@ -294,7 +290,6 @@ export default function DashboardPage() {
                       <th className="px-4 py-3 text-left text-gray-700">Status</th>
                       <th className="px-4 py-3 text-left text-gray-700">When</th>
                       <th className="px-4 py-3 text-left text-gray-700">Tx Link</th>
-                      <th className="px-4 py-3 text-left text-gray-700">Reason</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -314,10 +309,9 @@ export default function DashboardPage() {
                             </a>
                           ) : '-'}
                         </td>
-                        <td className="px-4 py-3 text-gray-900 break-all whitespace-normal min-w-[220px] max-w-[400px] align-top">{h.reason || '-'}</td>
                       </tr>
                     )) : <tr>
-                      <td colSpan={5} className="text-center py-3">No history</td>
+                      <td colSpan={4} className="text-center py-3">No history</td>
                     </tr>}
                     </tbody>
                   </table>
