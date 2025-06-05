@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { BrowserProvider, Contract } from 'ethers';
 import Link from 'next/link';
@@ -7,7 +7,7 @@ import contractJSON from '../contract.json';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
-const CONTRACT_ADDRESS = '0xBADFe18893763645bF24d8d34C62D48495Bb414A';
+const CONTRACT_ADDRESS = '0x1be7b9Ba6994Cad1497c8D21c3b02424DE901Cd4';
 const CONTRACT_ABI = contractJSON.abi;
 
 export default function SignPage() {
@@ -27,6 +27,12 @@ function SignPageContent() {
     const [file, setFile] = useState(null);
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
+    const [fileInputKey, setFileInputKey] = useState(Date.now()); // Add key for file input reset
+    const [availableStatuses, setAvailableStatuses] = useState([
+        { value: 'AccountingApproved', label: 'Accounting Approved' },
+        { value: 'LegalApproved', label: 'Legal Approved' },
+        { value: 'RectorApproved', label: 'Rector Approved' },
+    ]);
 
     // Map status string to enum value for the contract
     const statusEnum = {
@@ -46,6 +52,46 @@ function SignPageContent() {
                 return 'Legal Department';
         }
     };
+
+    // Fetch current on-chain status and set available statuses accordingly
+    const fetchAvailableStatuses = async (docId) => {
+        if (!docId) return;
+        try {
+            if (!window.ethereum) return;
+            await window.ethereum.request({ method: 'eth_requestAccounts' });
+            const provider = new BrowserProvider(window.ethereum);
+            const signer = await provider.getSigner();
+            const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+            const currentStatus = await contract.getDocumentStatus(docId);
+            // 0: Submitted, 1: AccountingApproved, 2: LegalApproved, 3: RectorApproved, 4: Rejected
+            let nextStatus = null;
+            if (Number(currentStatus) === 0) nextStatus = 'AccountingApproved';
+            else if (Number(currentStatus) === 1) nextStatus = 'LegalApproved';
+            else if (Number(currentStatus) === 2) nextStatus = 'RectorApproved';
+            else nextStatus = null;
+            if (nextStatus) {
+                setAvailableStatuses([
+                    { value: nextStatus, label: nextStatus.replace('Approved', ' Approved').replace('Rector', 'Rector') }
+                ]);
+                setStatus(nextStatus);
+            } else {
+                setAvailableStatuses([]);
+                setStatus('');
+            }
+        } catch (err) {
+            // fallback: show all
+            setAvailableStatuses([
+                { value: 'AccountingApproved', label: 'Accounting Approved' },
+                { value: 'LegalApproved', label: 'Legal Approved' },
+                { value: 'RectorApproved', label: 'Rector Approved' },
+            ]);
+        }
+    };
+
+    // Update available statuses when docId changes
+    useEffect(() => {
+        fetchAvailableStatuses(docId);
+    }, [docId]);
 
     // Handler for rejecting a document
     const handleReject = async (e) => {
@@ -70,17 +116,25 @@ function SignPageContent() {
             const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
             const currentStatus = await contract.getDocumentStatus(docId);
-            // Map contract status to status string for backend
+            // Log and show the current status to the user
             const statusNumToString = {
-                0: 'AccountingApproved', // For rejection, we want to use the next status as in sign logic
-                1: 'LegalApproved',
-                2: 'RectorApproved',
-                3: 'RectorApproved', // Already fully approved, should not be rejected
+                0: 'Submitted',
+                1: 'AccountingApproved',
+                2: 'LegalApproved',
+                3: 'RectorApproved',
                 4: 'Rejected'
             };
             const backendStatus = statusNumToString[Number(currentStatus)];
-            if (!backendStatus || Number(currentStatus) > 2) {
-                setMessage('❌ Cannot reject: Invalid or final status.');
+            // Debug log for docId and on-chain status
+            console.log(`[REJECT DEBUG] Frontend - docId: ${docId}, onChainStatus: ${currentStatus} (${backendStatus})`);
+            if (!backendStatus || Number(currentStatus) > 3) {
+                setMessage(`❌ Cannot reject: Current status is '${backendStatus}' (${currentStatus}). Only Submitted, AccountingApproved, LegalApproved, or RectorApproved can be rejected.`);
+                setLoading(false);
+                return;
+            }
+            // Prevent rejection if already rejected
+            if (Number(currentStatus) === 4) {
+                setMessage('❌ This document is already rejected on-chain. You cannot reject it again.');
                 setLoading(false);
                 return;
             }
@@ -111,7 +165,7 @@ function SignPageContent() {
                 0: 'Accounting', // Submitted
                 1: 'Legal',      // AccountingApproved
                 2: 'Rector',     // LegalApproved
-                3: '',           // RectorApproved (should not be rejected by anyone else)
+                3: 'Rector',     // RectorApproved (now allows rejection by Rector)
                 4: ''            // Rejected
             };
             const department = statusToDepartment[Number(currentStatus)];
@@ -122,8 +176,9 @@ function SignPageContent() {
             }
 
             // Step 3: Call smart contract to reject the document (MetaMask interaction)
+            let tx;
             try {
-                const tx = await contract.rejectDocument(docId, hash);
+                tx = await contract.rejectDocument(docId, hash);
                 setMessage('⏳ Waiting for transaction confirmation...');
                 await tx.wait();
             } catch (err) {
@@ -131,6 +186,10 @@ function SignPageContent() {
                 setLoading(false);
                 return;
             }
+
+            // Step 3.5: Re-fetch on-chain status after rejection (for info only)
+            const statusAfter = await contract.getDocumentStatus(docId);
+            // Always call backend to update DB, regardless of statusAfter
 
             // Step 4: Call backend to reject the document
             await axios.post('http://localhost:5000/api/documents/reject', {
@@ -142,8 +201,11 @@ function SignPageContent() {
             setDocId('');
             setStatus('AccountingApproved');
             setFile(null);
+            setFileInputKey(Date.now()); // Reset file input after success
         } catch (err) {
             setMessage(`❌ Error rejecting document: ${err.response?.data?.error || err.message}`);
+            setFile(null); // Reset file after error
+            setFileInputKey(Date.now()); // Reset file input after error
         } finally {
             setLoading(false);
         }
@@ -182,17 +244,40 @@ function SignPageContent() {
             const signer = await provider.getSigner();
             const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
+            // Get the on-chain document using getDocument
+            let docOnChain;
+            try {
+                docOnChain = await contract.getDocument(docId);
+                console.log('[SIGN DEBUG] docId:', docId, 'onChainHash:', docOnChain[1], 'localHash:', hash);
+            } catch (err) {
+                setMessage('❌ Cannot sign: Document not found on-chain.');
+                setLoading(false);
+                return;
+            }
+            const onChainHash = docOnChain[1];
+            if (!onChainHash || onChainHash === '0x' || onChainHash === '0x0000000000000000000000000000000000000000000000000000000000000000') {
+                setMessage('❌ Cannot sign: Document not found on-chain.');
+                setLoading(false);
+                return;
+            }
+            if (onChainHash !== hash) {
+                setMessage('❌ Cannot sign: Hash mismatch. The uploaded file does not match the submitted document.');
+                setLoading(false);
+                return;
+            }
+
             // Call verifyDocument on-chain
             const verifyResult = await contract.verifyDocument(docId, statusEnum[status], hash);
             // verifyResult is a tuple: [isValid, isPartial, message]
             // Allow signing if document is only submitted and user is trying to sign for AccountingApproved
             if (!verifyResult[0]) {
                 if (
-                    status === 'AccountingApproved' &&
-                    verifyResult[2] === 'Document is only submitted, not yet approved.'
+                    (verifyResult[1] && (
+                        verifyResult[2].includes('You may sign for the next approval.') ||
+                        verifyResult[2].includes('not yet approved.')
+                    ))
                 ) {
-                    // Allow signing for AccountingApproved
-                    // No error, continue
+                    // Allow signing for next approval or first approval after revert
                 } else {
                     setMessage(`❌ Cannot sign: ${verifyResult[2]}`);
                     setLoading(false);
@@ -222,6 +307,7 @@ function SignPageContent() {
             setDocId('');
             setStatus('AccountingApproved');
             setFile(null);
+            setFileInputKey(Date.now()); // Reset file input after success
         } catch (err) {
             console.error(err);
             // Custom error handling for MetaMask user rejection
@@ -237,6 +323,8 @@ function SignPageContent() {
             } else {
                 setMessage(`❌ Error: ${err.response?.data?.error || err.message}`);
             }
+            setFile(null); // Reset file after error
+            setFileInputKey(Date.now()); // Reset file input after error
         } finally {
             setLoading(false);
         }
@@ -259,12 +347,12 @@ function SignPageContent() {
                         value={status}
                         onChange={(e) => setStatus(e.target.value)}
                         className="w-full p-3 border border-gray-300 rounded-lg text-gray-900"
-                        disabled={!!initialStatus && initialStatus !== ''}
+                        disabled={availableStatuses.length === 0 || !!initialStatus && initialStatus !== ''}
                     >
                         <option value="">Select status</option>
-                        <option value="AccountingApproved">Accounting Approved</option>
-                        <option value="LegalApproved">Legal Approved</option>
-                        <option value="RectorApproved">Rector Approved</option>
+                        {availableStatuses.map((s) => (
+                            <option key={s.value} value={s.value}>{s.label}</option>
+                        ))}
                     </select>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Upload Document to Sign</label>
@@ -272,6 +360,7 @@ function SignPageContent() {
                             <label className="cursor-pointer inline-flex items-center px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm font-medium">
                                 Choose File
                                 <input
+                                    key={fileInputKey} // Add key to force re-render
                                     type="file"
                                     onChange={(e) => setFile(e.target.files[0])}
                                     className="hidden"

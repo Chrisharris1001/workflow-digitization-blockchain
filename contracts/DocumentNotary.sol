@@ -38,16 +38,37 @@ contract DocumentNotary {
         emit DocumentSubmitted(docId, msg.sender, hash, block.timestamp);
     }
 
+    function getLastNonRejectedStatus(string memory docId) internal view returns (Status) {
+        Status[] storage history = documents[docId].statusHistory;
+        for (uint i = history.length; i > 0; i--) {
+            if (history[i-1] != Status.Rejected) {
+                return history[i-1];
+            }
+        }
+        return Status.Submitted;
+    }
+
     function signDocument(string memory docId, Status newStatus, bytes32 hash) external docExists(docId) {
         require(newStatus != Status.Rejected, "Use rejectDocument for rejection");
         Status currentStatus = documents[docId].status;
 
+        // Allow normal forward flow or signing after revert
         if (newStatus == Status.AccountingApproved) {
             require(currentStatus == Status.Submitted, "Document must be submitted first");
         } else if (newStatus == Status.LegalApproved) {
-            require(currentStatus == Status.AccountingApproved, "Accounting approval required first");
+            Status lastNonRejected = getLastNonRejectedStatus(docId);
+            require(
+                currentStatus == Status.AccountingApproved ||
+                lastNonRejected == Status.AccountingApproved,
+                "Accounting approval required first or reverted to AccountingApproved"
+            );
         } else if (newStatus == Status.RectorApproved) {
-            require(currentStatus == Status.LegalApproved, "Legal approval required first");
+            Status lastNonRejected = getLastNonRejectedStatus(docId);
+            require(
+                currentStatus == Status.LegalApproved ||
+                lastNonRejected == Status.LegalApproved,
+                "Legal approval required first or reverted to LegalApproved"
+            );
         } else {
             revert("Invalid status update");
         }
@@ -134,18 +155,22 @@ contract DocumentNotary {
             return (true, false, "Document has been approved for a higher status.");
         }
 
+        // Allow signing again after revert: if the document is at a lower status than requested, allow partial approval
         if (uint8(documents[docId].status) < requestedStatus) {
             string memory currentStatusMsg;
             if (documents[docId].status == Status.AccountingApproved) {
-                currentStatusMsg = "Document is currently approved by Accounting.";
+                currentStatusMsg = "Document is currently approved by Accounting. You may sign for the next approval.";
+                return (false, true, currentStatusMsg);
             } else if (documents[docId].status == Status.LegalApproved) {
-                currentStatusMsg = "Document is currently approved by Legal.";
+                currentStatusMsg = "Document is currently approved by Legal. You may sign for the next approval.";
+                return (false, true, currentStatusMsg);
             } else if (documents[docId].status == Status.Submitted) {
                 currentStatusMsg = "Document is only submitted, not yet approved.";
+                return (false, true, currentStatusMsg);
             } else {
                 currentStatusMsg = "Document is at a lower approval stage.";
+                return (false, true, currentStatusMsg);
             }
-            return (false, true, currentStatusMsg);
         }
 
         return (false, false, "Document not valid for requested status");
@@ -165,5 +190,23 @@ contract DocumentNotary {
 
     function getStatusHistory(string memory docId) external view docExists(docId) returns (Status[] memory) {
         return documents[docId].statusHistory;
+    }
+
+    function getDocument(string memory docId) public view returns (
+        string memory,
+        bytes32,
+        Status,
+        Status,
+        address[] memory
+    ) {
+        require(documents[docId].timestamps[Status.Submitted] != 0, "Document does not exist");
+        Document storage doc = documents[docId];
+        return (
+            doc.docId,
+            doc.hash,
+            doc.status,
+            doc.previousStatus,
+            doc.approvers
+        );
     }
 }

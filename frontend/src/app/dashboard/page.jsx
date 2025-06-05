@@ -24,6 +24,8 @@ export default function DashboardPage() {
   const [selectedHistory, setSelectedHistory] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [department, setDepartment] = useState('Accounting');
+  const [revertLoadingDocId, setRevertLoadingDocId] = useState(null);
+  const [revertMessage, setRevertMessage] = useState('');
 
   const fetchDocuments = () => {
     setLoading(true);
@@ -143,14 +145,19 @@ export default function DashboardPage() {
                 h.status === 'LegalApproved' ||
                 h.status === 'RectorApproved')
             : null;
-          if (lastApproval && statusToDepartment[lastApproval.status] === department) {
+          // Only show in the department that last approved before rejection, and only if not reverted
+          if (lastApproval && statusToDepartment[lastApproval.status] === department && !isRevertedAfterRejection(doc)) {
             return true;
           }
           return false;
         }
         // Show if reverted after rejection and the revert was to this department (and still in that reverted state)
         const revertedStatus = isRevertedAfterRejection(doc);
-        if (revertedStatus && statusToDepartment[revertedStatus] === department && doc.status === revertedStatus) {
+        if (
+          revertedStatus &&
+          statusToDepartment[revertedStatus] === department &&
+          doc.status === revertedStatus
+        ) {
           return true;
         }
         return false;
@@ -185,8 +192,9 @@ export default function DashboardPage() {
                 <table className="min-w-full border border-gray-200 rounded-lg table-fixed">
                   <thead className="bg-gray-100">
                   <tr>
+                    <th className="px-4 py-2 text-left text-gray-700">ID</th>
                     <th className="px-4 py-2 text-left text-gray-700">Name</th>
-                    <th className="px-4 py-2 text-left text-gray-700">Status</th>
+                    <th className="px-4 py-2 text-left text-gray-700">Last Status</th>
                     <th className="px-4 py-2 text-left text-gray-700">Last Update</th>
                     <th className="px-4 py-2 text-left text-gray-700">Approval History</th>
                     <th className="px-4 py-2 text-left text-gray-700">Actions</th>
@@ -198,7 +206,8 @@ export default function DashboardPage() {
                     const rejectedInfo = department === 'Accounting' && doc.status === 'Rejected' ? isRejectedAfterAccounting(doc) : false;
                     return (
                         <tr key={doc._id} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="px-4 py-2 text-gray-900">{doc.name || doc.docId}</td>
+                          <td className="px-4 py-2 text-gray-900">{doc.docId}</td>
+                          <td className="px-4 py-2 text-gray-900">{doc.name || '-'}</td>
                           <td className="px-4 py-2 text-gray-900">
                             {doc.status === 'Rejected' && doc.history && doc.history.length > 0 ? (
                               <span className="font-bold text-red-700">Rejected</span>
@@ -214,12 +223,12 @@ export default function DashboardPage() {
                           </td>
                           <td className="px-4 py-2 flex gap-2">
                             {/* Only show Sign if in the correct status for this department */}
-                            {doc.status === departmentStatus[department] && (
+                            {doc.status === departmentStatus[department] || (isRevertedAfterRejection(doc) && doc.status === departmentStatus[department]) ? (
                               <Link href={`http://localhost:3000/sign?docId=${encodeURIComponent(doc.docId)}&status=${getNextStatus(doc)}`}
                                 className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">
                                 Sign
                               </Link>
-                            )}
+                            ) : null}
                             <a
                               href={`http://localhost:5000/api/documents/download/${encodeURIComponent(doc.filename)}`}
                               className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-medium"
@@ -245,8 +254,8 @@ export default function DashboardPage() {
                                 Delete
                               </button>
                             )}
-                            {/* Show Revert button only if document is rejected (not submitted) and this department last approved, or if admin */}
-                            {doc.status === 'Rejected' && doc.status !== 'Submitted' && ((department === 'Admin') || (() => {
+                            {/* Show Revert button only if document is rejected (not submitted), this department last approved, and NOT if the document was already reverted after rejection */}
+                            {doc.status === 'Rejected' && doc.status !== 'Submitted' && (() => {
                               const lastApproval = doc.history && doc.history.length > 1
                                 ? [...doc.history].reverse().find(h =>
                                     h.status === 'AccountingApproved' ||
@@ -254,22 +263,36 @@ export default function DashboardPage() {
                                     h.status === 'RectorApproved')
                                 : null;
                               if (lastApproval && statusToDepartment[lastApproval.status] === department) {
+                                // Prevent revert if the only approval before rejection is 'Submitted'
+                                // i.e., if the document was submitted, then rejected, and never approved
+                                const approvalsBeforeRejection = doc.history.filter(h =>
+                                  ["AccountingApproved", "LegalApproved", "RectorApproved"].includes(h.status)
+                                );
+                                if (approvalsBeforeRejection.length === 0) {
+                                  return false;
+                                }
                                 return true;
                               }
                               return false;
-                            })()) && (
+                            })() && (
                               <button
                                 className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-sm font-medium"
                                 onClick={async () => {
+                                  setRevertLoadingDocId(doc.docId);
+                                  setRevertMessage('Loading...reverting the file to the last department');
                                   try {
                                     await axios.post('http://localhost:5000/api/documents/revert', { docId: doc.docId });
                                     fetchDocuments();
+                                    setRevertMessage('');
                                   } catch (err) {
-                                    alert('Failed to revert document: ' + (err.response?.data?.error || err.message));
+                                    setRevertMessage('Failed to revert document: ' + (err.response?.data?.error || err.message));
+                                  } finally {
+                                    setRevertLoadingDocId(null);
                                   }
                                 }}
+                                disabled={revertLoadingDocId === doc.docId}
                               >
-                                Revert
+                                {revertLoadingDocId === doc.docId ? 'Reverting...' : 'Revert'}
                               </button>
                             )}
                           </td>
@@ -310,7 +333,17 @@ export default function DashboardPage() {
                             <a href={`${ETHERSCAN_BASE}${h.txHash}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
                               {h.txHash.slice(0, 10)}...
                             </a>
-                          ) : '-'}
+                          ) : (h.status === 'Rejected' && h.reason === 'Rejected on-chain' && selectedHistory && selectedHistory.length > 0 ? (
+                            // Try to find the txHash from the rejected entry if missing
+                            (() => {
+                              const rejectedEntry = selectedHistory.find(hist => hist.status === 'Rejected' && hist.txHash);
+                              return rejectedEntry ? (
+                                <a href={`${ETHERSCAN_BASE}${rejectedEntry.txHash}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                                  {rejectedEntry.txHash.slice(0, 10)}...
+                                </a>
+                              ) : '-';
+                            })()
+                          ) : '-')}
                         </td>
                       </tr>
                     )) : <tr>
@@ -324,6 +357,11 @@ export default function DashboardPage() {
                 </button>
               </div>
             </div>
+        )}
+        {revertMessage && (
+          <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-yellow-100 text-yellow-900 px-6 py-3 rounded-lg shadow-lg z-50 text-center font-mono">
+            {revertMessage}
+          </div>
         )}
       </div>
   );

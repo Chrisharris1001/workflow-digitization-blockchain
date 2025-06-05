@@ -7,6 +7,7 @@ export default function SubmitPage() {
     const [docId, setDocId] = useState('');
     const [file, setFile] = useState(null);
     const [status, setStatus] = useState('');
+    const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -15,6 +16,8 @@ export default function SubmitPage() {
             setStatus('⚠️ All fields are required.');
             return;
         }
+
+        setLoading(true);
 
         const formData = new FormData();
         formData.append('docId', docId);
@@ -28,6 +31,8 @@ export default function SubmitPage() {
         } catch (err) {
             console.error(err);
             setStatus(`❌ Error: ${err.response?.data?.error || err.message}`);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -62,25 +67,27 @@ export default function SubmitPage() {
                     <button
                         type="submit"
                         className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg"
+                        disabled={loading}
                     >
                         Submit
                     </button>
                 </form>
                 <Link href="/sign" className="mt-4 w-full inline-block text-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg">Go to sign page</Link>
-                {status && (
+                {(loading || status) && (
                     <div
                         className={`mt-4 text-sm px-4 py-2 rounded relative max-h-40 overflow-auto whitespace-pre-wrap break-words ${
-                            status.startsWith("✅")
-                                ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800"
+                            loading
+                                ? "bg-yellow-200 text-yellow-900 font-semibold text-center"
+                                : status.startsWith("✅")
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-red-100 text-red-800"
                         }`}
                         style={{ fontFamily: 'monospace' }}
                     >
-                        {status}
+                        {loading ? "⏳ Submitting the document..." : status}
                     </div>
                 )}
             </div>
         </div>
     );
-
 }

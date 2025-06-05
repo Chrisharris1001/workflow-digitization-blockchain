@@ -1,11 +1,12 @@
 {
-  "address": "0xBADFe18893763645bF24d8d34C62D48495Bb414A",
+  "address": "0x1be7b9Ba6994Cad1497c8D21c3b02424DE901Cd4",
   "abi": [
     {
       "anonymous": false,
       "inputs": [
         { "indexed": false, "internalType": "string", "name": "docId", "type": "string" },
         { "indexed": false, "internalType": "address", "name": "rejectedBy", "type": "address" },
+        { "indexed": false, "internalType": "bytes32", "name": "hash", "type": "bytes32" },
         { "indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256" }
       ],
       "name": "DocumentRejected",
@@ -33,6 +34,21 @@
       ],
       "name": "DocumentSubmitted",
       "type": "event"
+    },
+    {
+      "inputs": [
+        { "internalType": "string", "name": "docId", "type": "string" }
+      ],
+      "name": "getDocument",
+      "outputs": [
+        { "internalType": "string", "name": "", "type": "string" },
+        { "internalType": "bytes32", "name": "", "type": "bytes32" },
+        { "internalType": "enum DocumentNotary.Status", "name": "", "type": "uint8" },
+        { "internalType": "enum DocumentNotary.Status", "name": "", "type": "uint8" },
+        { "internalType": "address[]", "name": "", "type": "address[]" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
     },
     {
       "inputs": [
@@ -72,9 +88,9 @@
       "inputs": [
         { "internalType": "string", "name": "docId", "type": "string" }
       ],
-      "name": "getRejectionReason",
+      "name": "getStatusHistory",
       "outputs": [
-        { "internalType": "string", "name": "", "type": "string" }
+        { "internalType": "enum DocumentNotary.Status[]", "name": "", "type": "uint8[]" }
       ],
       "stateMutability": "view",
       "type": "function"
@@ -82,7 +98,7 @@
     {
       "inputs": [
         { "internalType": "string", "name": "docId", "type": "string" },
-        { "internalType": "string", "name": "reason", "type": "string" }
+        { "internalType": "bytes32", "name": "hash", "type": "bytes32" }
       ],
       "name": "rejectDocument",
       "outputs": [],
@@ -136,4 +152,3 @@
     }
   ]
 }
-
