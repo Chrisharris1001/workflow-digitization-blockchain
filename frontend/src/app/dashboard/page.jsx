@@ -18,6 +18,20 @@ const statusToDepartment = {
   RectorApproved: 'Rector',
 };
 
+// Helper: Get the next department after a given status
+const getNextDepartment = (status) => {
+  switch (status) {
+    case 'AccountingApproved':
+      return 'Legal';
+    case 'LegalApproved':
+      return 'Rector';
+    case 'RectorApproved':
+      return null; // No next department
+    default:
+      return null;
+  }
+};
+
 export default function DashboardPage() {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -137,6 +151,8 @@ export default function DashboardPage() {
     : documents.filter(doc => {
         // Show if in the department's active status
         if (doc.status === departmentStatus[department]) return true;
+        // Show RectorApproved docs in Rector dashboard
+        if (department === 'Rector' && doc.status === 'RectorApproved') return true;
         // Show rejected docs to the department that last approved before rejection
         if (doc.status === 'Rejected') {
           const lastApproval = doc.history && doc.history.length > 1
@@ -153,12 +169,11 @@ export default function DashboardPage() {
         }
         // Show if reverted after rejection and the revert was to this department (and still in that reverted state)
         const revertedStatus = isRevertedAfterRejection(doc);
-        if (
-          revertedStatus &&
-          statusToDepartment[revertedStatus] === department &&
-          doc.status === revertedStatus
-        ) {
-          return true;
+        if (revertedStatus && doc.status === revertedStatus) {
+          const nextDept = getNextDepartment(revertedStatus);
+          if (nextDept && department === nextDept) {
+            return true;
+          }
         }
         return false;
       });
