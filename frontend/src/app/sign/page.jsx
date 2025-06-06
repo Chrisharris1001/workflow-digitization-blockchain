@@ -6,6 +6,7 @@ import Link from 'next/link';
 import contractJSON from '../contract.json';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import { useAccount } from '../AccountContext';
 
 const CONTRACT_ADDRESS = '0x1be7b9Ba6994Cad1497c8D21c3b02424DE901Cd4';
 const CONTRACT_ABI = contractJSON.abi;
@@ -19,6 +20,7 @@ export default function SignPage() {
 }
 
 function SignPageContent() {
+    const { account, switchAccount } = useAccount();
     const searchParams = useSearchParams();
     const initialDocId = searchParams.get('docId') || '';
     const initialStatus = searchParams.get('status') || '';
@@ -96,6 +98,14 @@ function SignPageContent() {
     // Handler for rejecting a document
     const handleReject = async (e) => {
         e.preventDefault();
+        if (!account) {
+            setMessage('🔗 Please connect your MetaMask wallet to reject a document.');
+            await switchAccount();
+            if (!window.ethereum.selectedAddress) {
+                setMessage('❌ Wallet connection required to reject.');
+                return;
+            }
+        }
         if (!docId || !file) {
             setMessage('⚠️ Document ID and file are required to reject.');
             return;
@@ -213,6 +223,14 @@ function SignPageContent() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!account) {
+            setMessage('🔗 Please connect your MetaMask wallet to sign a document.');
+            await switchAccount();
+            if (!window.ethereum.selectedAddress) {
+                setMessage('❌ Wallet connection required to sign.');
+                return;
+            }
+        }
 
         if (!docId || !status || !file) {
             setMessage('⚠️ All fields are required.');
@@ -330,6 +348,11 @@ function SignPageContent() {
         }
     };
 
+    // Add a connect wallet handler
+    const handleConnectWallet = async () => {
+        await switchAccount();
+    };
+
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-100">
             <div className="w-full max-w-lg p-8 bg-white shadow-xl rounded-lg">
@@ -375,7 +398,7 @@ function SignPageContent() {
                         <button
                             type="submit"
                             className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg"
-                            disabled={loading}
+                            disabled={loading || !account}
                         >
                             Sign
                         </button>
@@ -383,7 +406,7 @@ function SignPageContent() {
                             type="button"
                             onClick={handleReject}
                             className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg"
-                            disabled={loading}
+                            disabled={loading || !account}
                         >
                             Reject
                         </button>
@@ -393,13 +416,17 @@ function SignPageContent() {
                 {message && (
                     <div
                         className={`mt-4 text-sm px-4 py-2 rounded max-h-40 overflow-auto whitespace-pre-wrap break-words ${
-                            message.startsWith('✅')
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
+                            loading || message.startsWith('⏳') || message.toLowerCase().includes('waiting for metamask')
+                                ? 'bg-yellow-200 text-yellow-900 font-semibold text-center'
+                                : message.startsWith('✅')
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-red-100 text-red-800'
                         }`}
                         style={{ fontFamily: 'monospace' }}
                     >
-                        {message}
+                        {loading || message.startsWith('⏳') || message.toLowerCase().includes('waiting for metamask')
+                            ? `⏳ ${message.replace(/^⏳\s*/, '')}`
+                            : message}
                     </div>
                 )}
             </div>

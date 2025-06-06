@@ -324,48 +324,42 @@ export default function DashboardPage() {
               <div className="bg-white p-12 rounded-2xl shadow-2xl min-w-[320px] max-w-6xl w-full max-h-[95vh]">
                 <h2 className="text-3xl font-semibold text-gray-800 mb-6">Approval History</h2>
                 <div className="overflow-auto max-h-[85vh]">
-                  <table className="min-w-full border border-gray-200 rounded-lg">
-                    <thead className="bg-gray-100">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-gray-700">Who (Address)</th>
-                      <th className="px-4 py-3 text-left text-gray-700">Status</th>
-                      <th className="px-4 py-3 text-left text-gray-700">When</th>
-                      <th className="px-4 py-3 text-left text-gray-700">Tx Link</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {selectedHistory && selectedHistory.length > 0 ? selectedHistory.map((h, idx) => (
-                      <tr key={idx} className="border-b border-gray-100 align-top">
-                        <td className="px-4 py-3 text-gray-900 align-top">
-                          {h.author && h.author.length > 12
-                            ? `${h.author.slice(0, 7)}...${h.author.slice(-6)}`
-                            : (h.author || '-')}
-                        </td>
-                        <td className="px-4 py-3 text-gray-900 break-all whitespace-normal min-w-[120px] max-w-[180px] align-top">{h.status}</td>
-                        <td className="px-4 py-3 text-gray-900 break-all whitespace-normal min-w-[120px] max-w-[180px] align-top">{h.timestamp ? new Date(h.timestamp).toLocaleString() : '-'}</td>
-                        <td className="px-4 py-3 text-gray-900 whitespace-nowrap align-top">
-                          {h.txHash ? (
-                            <a href={`${ETHERSCAN_BASE}${h.txHash}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
-                              {h.txHash.slice(0, 10)}...
-                            </a>
-                          ) : (h.status === 'Rejected' && h.reason === 'Rejected on-chain' && selectedHistory && selectedHistory.length > 0 ? (
-                            // Try to find the txHash from the rejected entry if missing
-                            (() => {
-                              const rejectedEntry = selectedHistory.find(hist => hist.status === 'Rejected' && hist.txHash);
-                              return rejectedEntry ? (
-                                <a href={`${ETHERSCAN_BASE}${rejectedEntry.txHash}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
-                                  {rejectedEntry.txHash.slice(0, 10)}...
-                                </a>
-                              ) : '-';
-                            })()
-                          ) : '-')}
-                        </td>
+                  <div className="overflow-x-auto max-w-full" style={{ minWidth: '350px' }}>
+                    <table className="min-w-full border border-gray-200 rounded-lg">
+                      <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-gray-700">Who (Address)</th>
+                        <th className="px-4 py-3 text-left text-gray-700">Status</th>
+                        <th className="px-4 py-3 text-left text-gray-700">When</th>
+                        <th className="px-4 py-3 text-left text-gray-700">Tx Link</th>
                       </tr>
-                    )) : <tr>
-                      <td colSpan={4} className="text-center py-3">No history</td>
-                    </tr>}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                      {selectedHistory && selectedHistory.length > 0 ? selectedHistory.map((h, idx) => (
+                        <tr key={idx} className="border-b border-gray-100 align-top">
+                          <td className="px-4 py-3 text-gray-900 align-top">
+                            {h.author && h.author.length > 12
+                              ? `${h.author.slice(0, 7)}...${h.author.slice(-6)}`
+                              : (h.author || '-')}
+                          </td>
+                          <td className="px-4 py-3 text-gray-900 break-all whitespace-normal min-w-[120px] max-w-[180px] align-top">{h.status}</td>
+                          <td className="px-4 py-3 text-gray-900 break-all whitespace-normal min-w-[120px] max-w-[180px] align-top">{h.timestamp ? new Date(h.timestamp).toLocaleString() : '-'}</td>
+                          <td className="px-4 py-3 text-gray-900 whitespace-nowrap align-top">
+                            {h.txHash ? (
+                              <a href={`${ETHERSCAN_BASE}${h.txHash}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                                {h.txHash.slice(0, 10)}...
+                              </a>
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                        </tr>
+                      )) : <tr>
+                        <td colSpan={4} className="text-center py-3">No history</td>
+                      </tr>}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
                 <button className="mt-6 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded w-full text-sm font-medium"
                         onClick={closeHistory}>Close

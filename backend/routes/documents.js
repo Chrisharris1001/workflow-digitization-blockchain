@@ -21,7 +21,19 @@ const upload = multer({ dest: uploadDir });
 const contractAddress = '0x1be7b9Ba6994Cad1497c8D21c3b02424DE901Cd4';
 
 const provider = new InfuraProvider('sepolia', process.env.INFURA_API_KEY);
-const wallet = new Wallet(process.env.PRIVATE_KEY, provider);
+
+// Wallet and provider setup with error handling
+let wallet;
+if (!process.env.PRIVATE_KEY) {
+    console.error('❌ Error: No PRIVATE_KEY found in environment variables. Please set PRIVATE_KEY in your .env file.');
+    throw new Error('No active wallet found: PRIVATE_KEY missing.');
+}
+try {
+    wallet = new Wallet(process.env.PRIVATE_KEY, provider);
+} catch (err) {
+    console.error('❌ Error: Failed to create wallet. Check your PRIVATE_KEY.');
+    throw err;
+}
 const contract = new Contract(contractAddress, contractJson.abi, wallet);
 
 const statusEnum = {
@@ -297,11 +309,17 @@ router.post('/reject', async (req, res) => {
         // If already rejected on-chain, only update the database
         if (Number(onChainStatus) === 4) { // Already rejected on-chain
             let newStatus = 'Rejected';
+            // Try to get the last rejection txHash from history if available
+            let lastRejectionTxHash = null;
+            if (doc.history && doc.history.length > 0) {
+                const lastRejection = [...doc.history].reverse().find(h => h.status === 'Rejected' && h.txHash);
+                if (lastRejection) lastRejectionTxHash = lastRejection.txHash;
+            }
             const historyEntry = {
                 status: newStatus,
                 timestamp: new Date(),
                 department,
-                txHash: null,
+                txHash: lastRejectionTxHash, // Use last known rejection txHash if available
                 author: wallet.address,
             };
             const updateOps = {
@@ -345,11 +363,17 @@ router.post('/reject', async (req, res) => {
         // If already rejected on-chain, only update the database
         if (Number(onChainStatus) === 4) { // Already rejected on-chain
             let newStatus = 'Rejected';
+            // Try to get the last rejection txHash from history if available
+            let lastRejectionTxHash = null;
+            if (doc.history && doc.history.length > 0) {
+                const lastRejection = [...doc.history].reverse().find(h => h.status === 'Rejected' && h.txHash);
+                if (lastRejection) lastRejectionTxHash = lastRejection.txHash;
+            }
             const historyEntry = {
                 status: newStatus,
                 timestamp: new Date(),
                 department,
-                txHash: null,
+                txHash: lastRejectionTxHash, // Use last known rejection txHash if available
                 author: wallet.address,
             };
             const updateOps = {

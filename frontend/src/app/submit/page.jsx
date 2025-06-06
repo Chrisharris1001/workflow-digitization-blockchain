@@ -43,7 +43,7 @@ export default function SubmitPage() {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <input
                         type="text"
-                        placeholder="Document ID (e.g., TRIP-001)"
+                        placeholder="Document ID (for example: TRIP-001)"
                         value={docId}
                         onChange={(e) => setDocId(e.target.value)}
                         className="w-full p-3 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400"
