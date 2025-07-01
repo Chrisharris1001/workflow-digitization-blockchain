@@ -8,7 +8,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { useAccount } from '../AccountContext';
 
-const CONTRACT_ADDRESS = '0x1be7b9Ba6994Cad1497c8D21c3b02424DE901Cd4';
+const CONTRACT_ADDRESS = '0x654491e072d893034B80194FCB30117591A550ee';
 const CONTRACT_ABI = contractJSON.abi;
 
 export default function SignPage() {
@@ -135,8 +135,7 @@ function SignPageContent() {
                 4: 'Rejected'
             };
             const backendStatus = statusNumToString[Number(currentStatus)];
-            // Debug log for docId and on-chain status
-            console.log(`[REJECT DEBUG] Frontend - docId: ${docId}, onChainStatus: ${currentStatus} (${backendStatus})`);
+
             if (!backendStatus || Number(currentStatus) > 3) {
                 setMessage(`❌ Cannot reject: Current status is '${backendStatus}' (${currentStatus}). Only Submitted, AccountingApproved, LegalApproved, or RectorApproved can be rejected.`);
                 setLoading(false);
@@ -207,7 +206,7 @@ function SignPageContent() {
                 hash,
                 department
             });
-            setMessage(`❌ Document rejected and recorded on blockchain!`);
+            setMessage(`✅ Document rejected and the status is updated on blockchain! Tx: ${tx.hash}`);
             setDocId('');
             setStatus('AccountingApproved');
             setFile(null);
@@ -266,7 +265,6 @@ function SignPageContent() {
             let docOnChain;
             try {
                 docOnChain = await contract.getDocument(docId);
-                console.log('[SIGN DEBUG] docId:', docId, 'onChainHash:', docOnChain[1], 'localHash:', hash);
             } catch (err) {
                 setMessage('❌ Cannot sign: Document not found on-chain.');
                 setLoading(false);
@@ -321,7 +319,7 @@ function SignPageContent() {
                 author: signerAddress
             });
 
-            setMessage(`✅ Document status signed on-chain! Tx: ${tx.hash}`);
+            setMessage(`✅ Document status recorded on-chain! Tx: ${tx.hash}`);
             setDocId('');
             setStatus('AccountingApproved');
             setFile(null);
@@ -337,7 +335,7 @@ function SignPageContent() {
                     err.message.includes('User denied transaction signature')
                 ))
             ) {
-                setMessage(`You have canceled the process to sign a document from the ${getPrecedingDepartment(status)}, please try again!`);
+                setMessage(`You have canceled the process to sign/reject a document from the ${getPrecedingDepartment(status)}, please try again!`);
             } else {
                 setMessage(`❌ Error: ${err.response?.data?.error || err.message}`);
             }

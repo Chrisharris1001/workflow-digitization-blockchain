@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-contract DocumentNotary {
+import "@openzeppelin/contracts/access/AccessControl.sol";
+
+contract DocumentNotary is AccessControl {
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 public constant APPROVER_ROLE = keccak256("APPROVER_ROLE");
+
     enum Status { Submitted, AccountingApproved, LegalApproved, RectorApproved, Rejected }
 
     struct Document {
@@ -19,10 +24,32 @@ contract DocumentNotary {
     event DocumentSubmitted(string docId, address sender, bytes32 hash, uint256 timestamp);
     event DocumentRejected(string docId, address rejectedBy, bytes32 hash, uint256 timestamp);
     event DocumentSigned(string docId, Status status, address signer, bytes32 hash, uint256 timestamp);
+    event DocumentDeleted(string docId, address deletedBy, uint256 timestamp);
+
+    /**
+     * @notice Only approver can sign, reject, or revert documents.
+     * Only admin can delete a document.
+     * Anyone can submit and verify documents.
+     * Use grantRole and revokeRole from AccessControl to manage roles.
+     */
 
     modifier docExists(string memory docId) {
        require(documents[docId].timestamps[Status.Submitted] != 0, "Document does not exist");
        _;
+    }
+
+    modifier onlyAdminOrApprover() {
+        require(
+            hasRole(DEFAULT_ADMIN_ROLE, msg.sender) || hasRole(APPROVER_ROLE, msg.sender),
+            "Not admin or approver"
+        );
+        _;
+    }
+
+    constructor() {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(ADMIN_ROLE, msg.sender);
+        _grantRole(APPROVER_ROLE, msg.sender);
     }
 
     function submitDocument(string memory docId, bytes32 hash) external {
@@ -48,7 +75,7 @@ contract DocumentNotary {
         return Status.Submitted;
     }
 
-    function signDocument(string memory docId, Status newStatus, bytes32 hash) external docExists(docId) {
+    function signDocument(string memory docId, Status newStatus, bytes32 hash) external onlyAdminOrApprover docExists(docId) {
         require(newStatus != Status.Rejected, "Use rejectDocument for rejection");
         Status currentStatus = documents[docId].status;
 
@@ -83,7 +110,7 @@ contract DocumentNotary {
         emit DocumentSigned(docId, newStatus, msg.sender, hash, block.timestamp);
     }
 
-    function rejectDocument(string memory docId, bytes32 hash) external docExists(docId) {
+    function rejectDocument(string memory docId, bytes32 hash) external onlyAdminOrApprover docExists(docId) {
         require(
             documents[docId].status == Status.Submitted ||
             documents[docId].status == Status.AccountingApproved ||
@@ -104,7 +131,7 @@ contract DocumentNotary {
         emit DocumentRejected(docId, msg.sender, hash, block.timestamp);
     }
 
-    function revertToPreviousStatus(string memory docId) external docExists(docId) {
+    function revertToPreviousStatus(string memory docId) external onlyAdminOrApprover docExists(docId) {
         require(
             documents[docId].status == Status.Rejected,
             "Can only revert from Rejected status"
@@ -208,5 +235,24 @@ contract DocumentNotary {
             doc.previousStatus,
             doc.approvers
         );
+    }
+
+    function deleteDocument(string memory docId) external onlyRole(DEFAULT_ADMIN_ROLE) docExists(docId) {
+        delete documents[docId];
+        emit DocumentDeleted(docId, msg.sender, block.timestamp);
+    }
+
+    /**
+     * @notice Grant a role to an account. Only admin can call this.
+     */
+    function grantRoleTo(address account, bytes32 role) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        grantRole(role, account);
+    }
+
+    /**
+     * @notice Revoke a role from an account. Only admin can call this.
+     */
+    function revokeRoleFrom(address account, bytes32 role) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        revokeRole(role, account);
     }
 }

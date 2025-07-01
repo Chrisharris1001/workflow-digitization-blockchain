@@ -25,7 +25,7 @@ export default function SubmitPage() {
 
         try {
             const res = await axios.post('http://localhost:5000/api/documents/submit-doc', formData);
-            setStatus(`✅ Success! Tx: ${res.data.txHash}`);
+            setStatus(`✅ Success! Status updated on-chain; Tx: ${res.data.txHash}`);
             setDocId('');
             setFile(null);
         } catch (err) {

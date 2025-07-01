@@ -40,6 +40,10 @@ export default function DashboardPage() {
   const [department, setDepartment] = useState('Accounting');
   const [revertLoadingDocId, setRevertLoadingDocId] = useState(null);
   const [revertMessage, setRevertMessage] = useState('');
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [roleForm, setRoleForm] = useState({ address: '', role: 'APPROVER_ROLE', action: 'grant' });
+  const [roleLoading, setRoleLoading] = useState(false);
+  const [roleMessage, setRoleMessage] = useState('');
 
   const fetchDocuments = () => {
     setLoading(true);
@@ -178,6 +182,24 @@ export default function DashboardPage() {
         return false;
       });
 
+  const handleRoleSubmit = async (e) => {
+    e.preventDefault();
+    setRoleLoading(true);
+    setRoleMessage('');
+    try {
+      const endpoint = roleForm.action === 'grant' ? '/admin/grant-role' : '/admin/revoke-role';
+      const res = await axios.post(`http://localhost:5000/api/documents${endpoint}`, {
+        address: roleForm.address,
+        role: roleForm.role
+      });
+      setRoleMessage('Success! Status updated on-chain; Tx: ' + res.data.txHash);
+    } catch (err) {
+      setRoleMessage('Error: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setRoleLoading(false);
+    }
+  };
+
   return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="w-full max-w-6xl bg-white shadow-xl rounded-lg p-8">
@@ -200,6 +222,14 @@ export default function DashboardPage() {
               </button>
               <a href="/"
                  className="px-3 py-1 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium flex items-center">Home</a>
+              {department === 'Admin' && (
+                <button
+                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium"
+                  onClick={() => setShowRoleModal(true)}
+                >
+                  Manage Roles
+                </button>
+              )}
             </div>
           </div>
           {loading ? <p className="text-gray-600">Loading...</p> : (
@@ -370,6 +400,57 @@ export default function DashboardPage() {
         {revertMessage && (
           <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-yellow-100 text-yellow-900 px-6 py-3 rounded-lg shadow-lg z-50 text-center font-mono">
             {revertMessage}
+          </div>
+        )}
+        {showRoleModal && (
+          <div className="fixed inset-0 flex items-center justify-center bg-gray-200 bg-opacity-80 z-50">
+            <div className="bg-white p-8 rounded-2xl shadow-2xl min-w-[320px] max-w-md w-full">
+              <h2 className="text-2xl font-semibold text-gray-800 mb-4">Manage Roles</h2>
+              <form onSubmit={handleRoleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-gray-700 mb-1">Address</label>
+                  <input
+                    type="text"
+                    className="w-full border rounded px-3 py-2 text-black"
+                    value={roleForm.address}
+                    onChange={e => setRoleForm({ ...roleForm, address: e.target.value })}
+                    required
+                    placeholder="example: 0x1234...abcd"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 mb-1">Role</label>
+                  <select
+                    className="w-full border rounded px-3 py-2 text-black"
+                    value={roleForm.role}
+                    onChange={e => setRoleForm({ ...roleForm, role: e.target.value })}
+                  >
+                    <option value="APPROVER_ROLE" className="text-black">Approver</option>
+                    <option value="ADMIN_ROLE" className="text-black">Admin</option>
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="px-3 py-1 bg-gray-400 hover:bg-gray-500 text-white rounded text-sm"
+                    onClick={() => setShowRoleModal(false)}
+                  >Cancel</button>
+                  <button
+                    type="submit"
+                    className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
+                    disabled={roleLoading}
+                    onClick={() => setRoleForm({ ...roleForm, action: 'grant' })}
+                  >Grant Role</button>
+                  <button
+                    type="submit"
+                    className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                    disabled={roleLoading}
+                    onClick={() => setRoleForm({ ...roleForm, action: 'revoke' })}
+                  >Revoke Role</button>
+                </div>
+              </form>
+              {roleMessage && <div className="mt-4 text-center text-sm text-black">{roleMessage}</div>}
+            </div>
           </div>
         )}
       </div>

@@ -18,7 +18,7 @@ if (!fs.existsSync(uploadDir)) {
 }
 const upload = multer({ dest: uploadDir });
 
-const contractAddress = '0x1be7b9Ba6994Cad1497c8D21c3b02424DE901Cd4';
+const contractAddress = '0x654491e072d893034B80194FCB30117591A550ee';
 
 const provider = new InfuraProvider('sepolia', process.env.INFURA_API_KEY);
 
@@ -60,8 +60,6 @@ router.post('/submit-doc', upload.single('document'), async (req, res) => {
         const fileBuffer = fs.readFileSync(file.path);
         const parsed = await pdfParse(fileBuffer);
         const hash = keccak256(fileBuffer);
-
-        console.log('[SUBMIT] docId:', docId, 'hash:', hash);
 
         if (!docId || !file) {
             return res.status(400).json({ error: 'Missing required fields.' });
@@ -105,11 +103,8 @@ router.post('/submit-doc', upload.single('document'), async (req, res) => {
         // Check if at least one required phrase is present
         const containsRequiredPhrase = requiredPhrases.some(phrase => parsed.text.includes(phrase));
         if (!containsRequiredPhrase) {
-            return res.status(400).json({ error: 'PDF missing required content. It must contain at least one of the required phrases.' });
+            return res.status(400).json({ error: 'PDF missing required content' });
         }
-
-        console.log('[DEBUG] Using contract address:', contractAddress);
-        console.log('[DEBUG] ABI first function:', contractJson.abi[0]?.name);
 
         const tx = await contract.submitDocument(docId, hash);
         await tx.wait();
@@ -127,10 +122,10 @@ router.post('/submit-doc', upload.single('document'), async (req, res) => {
                 $push: {
                     history: {
                         status: 'Submitted',
-                        author: wallet.address, // Save author
+                        author: wallet.address,
                         timestamp: new Date(),
                         hash: hash,
-                        txHash: tx.hash, // Save txHash
+                        txHash: tx.hash,
                         docId: docId,
                     }
                 }
@@ -162,13 +157,11 @@ router.post('/sign', upload.single('document'), async (req, res) => {
         const fileBuffer = fs.readFileSync(file.path);
         const hash = keccak256(fileBuffer);
 
-        console.log('[SIGN] docId:', docId, 'status:', statusStr, 'hash:', hash);
-
         // Fetch on-chain document and log the on-chain hash for debugging
         try {
             const docOnChain = await contract.getDocument(docId);
             const onChainHash = docOnChain[1];
-            console.log(`[SIGN DEBUG] On-chain hash for docId ${docId}:`, onChainHash);
+
             if (!onChainHash || onChainHash === '0x' || onChainHash === '0x0000000000000000000000000000000000000000000000000000000000000000') {
                 return res.status(404).json({ error: 'Document not found on-chain.' });
             }
@@ -176,7 +169,6 @@ router.post('/sign', upload.single('document'), async (req, res) => {
                 return res.status(400).json({ error: 'Hash mismatch with on-chain document.' });
             }
         } catch (err) {
-            console.error('[SIGN ERROR] Failed to fetch on-chain document:', err);
             return res.status(500).json({ error: 'Failed to fetch on-chain document.' });
         }
 
@@ -305,7 +297,7 @@ router.post('/reject', async (req, res) => {
 
         // On-chain status
         const onChainStatus = await contract.getDocumentStatus(docId);
-        console.log(`[REJECT DEBUG] Backend - docId: ${docId}, onChainStatus: ${onChainStatus}`);
+
         // If already rejected on-chain, only update the database
         if (Number(onChainStatus) === 4) { // Already rejected on-chain
             let newStatus = 'Rejected';
@@ -527,6 +519,50 @@ router.delete('/delete/:docId', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to delete document.' });
+    }
+});
+
+// Role hashes (must match contract)
+const ADMIN_ROLE = '0x' + Buffer.from('ADMIN_ROLE').toString('hex').padEnd(64, '0');
+const APPROVER_ROLE = '0x' + Buffer.from('APPROVER_ROLE').toString('hex').padEnd(64, '0');
+
+// Grant role to an address (admin only)
+router.post('/admin/grant-role', async (req, res) => {
+    try {
+        const { address, role } = req.body;
+        if (!address || !role) {
+            return res.status(400).json({ error: 'address and role are required.' });
+        }
+        let roleHash;
+        if (role === 'ADMIN_ROLE') roleHash = ADMIN_ROLE;
+        else if (role === 'APPROVER_ROLE') roleHash = APPROVER_ROLE;
+        else return res.status(400).json({ error: 'Invalid role.' });
+        const tx = await contract.grantRoleTo(address, roleHash);
+        await tx.wait();
+        res.json({ success: true, txHash: tx.hash });
+    } catch (err) {
+        console.error('Grant role error:', err);
+        res.status(500).json({ error: err.message || 'Failed to grant role.' });
+    }
+});
+
+// Revoke role from an address (admin only)
+router.post('/admin/revoke-role', async (req, res) => {
+    try {
+        const { address, role } = req.body;
+        if (!address || !role) {
+            return res.status(400).json({ error: 'address and role are required.' });
+        }
+        let roleHash;
+        if (role === 'ADMIN_ROLE') roleHash = ADMIN_ROLE;
+        else if (role === 'APPROVER_ROLE') roleHash = APPROVER_ROLE;
+        else return res.status(400).json({ error: 'Invalid role.' });
+        const tx = await contract.revokeRoleFrom(address, roleHash);
+        await tx.wait();
+        res.json({ success: true, txHash: tx.hash });
+    } catch (err) {
+        console.error('Revoke role error:', err);
+        res.status(500).json({ error: err.message || 'Failed to revoke role.' });
     }
 });
 

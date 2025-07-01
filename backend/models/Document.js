@@ -15,7 +15,7 @@ const DocumentSchema = new mongoose.Schema({
         type: Number,
         default: 1,
     },
-    status: String, // Use only status
+    status: String,
     filename: String,
     history: [HistorySchema],
 });

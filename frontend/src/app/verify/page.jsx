@@ -27,7 +27,7 @@ export default function VerifyPage() {
             const { valid, partiallyApproved, message, blockchainStatus } = res.data;
 
             if (valid) {
-                setResult(`✅ Document is fully valid. ${message}`);
+                setResult(`✅ Document is valid. ${message}`);
             } else if (partiallyApproved) {
                 setResult(`🟡 ${message}`);
             } else {

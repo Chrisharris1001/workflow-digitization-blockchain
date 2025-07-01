@@ -1,13 +1,84 @@
 {
-  "address": "0x1be7b9Ba6994Cad1497c8D21c3b02424DE901Cd4",
+  "address": "0x654491e072d893034B80194FCB30117591A550ee",
   "abi": [
+    {
+      "inputs": [],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "AccessControlBadConfirmation",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "neededRole",
+          "type": "bytes32"
+        }
+      ],
+      "name": "AccessControlUnauthorizedAccount",
+      "type": "error"
+    },
     {
       "anonymous": false,
       "inputs": [
-        { "indexed": false, "internalType": "string", "name": "docId", "type": "string" },
-        { "indexed": false, "internalType": "address", "name": "rejectedBy", "type": "address" },
-        { "indexed": false, "internalType": "bytes32", "name": "hash", "type": "bytes32" },
-        { "indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "docId",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "deletedBy",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        }
+      ],
+      "name": "DocumentDeleted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "docId",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "rejectedBy",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "hash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        }
       ],
       "name": "DocumentRejected",
       "type": "event"
@@ -15,11 +86,36 @@
     {
       "anonymous": false,
       "inputs": [
-        { "indexed": false, "internalType": "string", "name": "docId", "type": "string" },
-        { "indexed": false, "internalType": "enum DocumentNotary.Status", "name": "status", "type": "uint8" },
-        { "indexed": false, "internalType": "address", "name": "signer", "type": "address" },
-        { "indexed": false, "internalType": "bytes32", "name": "hash", "type": "bytes32" },
-        { "indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "docId",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum DocumentNotary.Status",
+          "name": "status",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "signer",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "hash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        }
       ],
       "name": "DocumentSigned",
       "type": "event"
@@ -27,78 +123,293 @@
     {
       "anonymous": false,
       "inputs": [
-        { "indexed": false, "internalType": "string", "name": "docId", "type": "string" },
-        { "indexed": false, "internalType": "address", "name": "sender", "type": "address" },
-        { "indexed": false, "internalType": "bytes32", "name": "hash", "type": "bytes32" },
-        { "indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "docId",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "hash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        }
       ],
       "name": "DocumentSubmitted",
       "type": "event"
     },
     {
+      "anonymous": false,
       "inputs": [
-        { "internalType": "string", "name": "docId", "type": "string" }
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "previousAdminRole",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "newAdminRole",
+          "type": "bytes32"
+        }
+      ],
+      "name": "RoleAdminChanged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        }
+      ],
+      "name": "RoleGranted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        }
+      ],
+      "name": "RoleRevoked",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "ADMIN_ROLE",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "APPROVER_ROLE",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "DEFAULT_ADMIN_ROLE",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "docId",
+          "type": "string"
+        }
+      ],
+      "name": "deleteDocument",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "docId",
+          "type": "string"
+        }
       ],
       "name": "getDocument",
       "outputs": [
-        { "internalType": "string", "name": "", "type": "string" },
-        { "internalType": "bytes32", "name": "", "type": "bytes32" },
-        { "internalType": "enum DocumentNotary.Status", "name": "", "type": "uint8" },
-        { "internalType": "enum DocumentNotary.Status", "name": "", "type": "uint8" },
-        { "internalType": "address[]", "name": "", "type": "address[]" }
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "enum DocumentNotary.Status",
+          "name": "",
+          "type": "uint8"
+        },
+        {
+          "internalType": "enum DocumentNotary.Status",
+          "name": "",
+          "type": "uint8"
+        },
+        {
+          "internalType": "address[]",
+          "name": "",
+          "type": "address[]"
+        }
       ],
       "stateMutability": "view",
       "type": "function"
     },
     {
       "inputs": [
-        { "internalType": "string", "name": "docId", "type": "string" }
+        {
+          "internalType": "string",
+          "name": "docId",
+          "type": "string"
+        }
       ],
       "name": "getDocumentApprovers",
       "outputs": [
-        { "internalType": "address[]", "name": "", "type": "address[]" }
+        {
+          "internalType": "address[]",
+          "name": "",
+          "type": "address[]"
+        }
       ],
       "stateMutability": "view",
       "type": "function"
     },
     {
       "inputs": [
-        { "internalType": "string", "name": "docId", "type": "string" }
+        {
+          "internalType": "string",
+          "name": "docId",
+          "type": "string"
+        }
       ],
       "name": "getDocumentStatus",
       "outputs": [
-        { "internalType": "enum DocumentNotary.Status", "name": "", "type": "uint8" }
+        {
+          "internalType": "enum DocumentNotary.Status",
+          "name": "",
+          "type": "uint8"
+        }
       ],
       "stateMutability": "view",
       "type": "function"
     },
     {
       "inputs": [
-        { "internalType": "string", "name": "docId", "type": "string" },
-        { "internalType": "enum DocumentNotary.Status", "name": "status", "type": "uint8" }
+        {
+          "internalType": "string",
+          "name": "docId",
+          "type": "string"
+        },
+        {
+          "internalType": "enum DocumentNotary.Status",
+          "name": "status",
+          "type": "uint8"
+        }
       ],
       "name": "getDocumentTimestamp",
       "outputs": [
-        { "internalType": "uint256", "name": "", "type": "uint256" }
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
       ],
       "stateMutability": "view",
       "type": "function"
     },
     {
       "inputs": [
-        { "internalType": "string", "name": "docId", "type": "string" }
+        {
+          "internalType": "string",
+          "name": "docId",
+          "type": "string"
+        }
       ],
       "name": "getStatusHistory",
       "outputs": [
-        { "internalType": "enum DocumentNotary.Status[]", "name": "", "type": "uint8[]" }
+        {
+          "internalType": "enum DocumentNotary.Status[]",
+          "name": "",
+          "type": "uint8[]"
+        }
       ],
       "stateMutability": "view",
       "type": "function"
     },
     {
       "inputs": [
-        { "internalType": "string", "name": "docId", "type": "string" },
-        { "internalType": "bytes32", "name": "hash", "type": "bytes32" }
+        {
+          "internalType": "string",
+          "name": "docId",
+          "type": "string"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "hash",
+          "type": "bytes32"
+        }
       ],
       "name": "rejectDocument",
       "outputs": [],
@@ -107,7 +418,11 @@
     },
     {
       "inputs": [
-        { "internalType": "string", "name": "docId", "type": "string" }
+        {
+          "internalType": "string",
+          "name": "docId",
+          "type": "string"
+        }
       ],
       "name": "revertToPreviousStatus",
       "outputs": [],
@@ -116,9 +431,21 @@
     },
     {
       "inputs": [
-        { "internalType": "string", "name": "docId", "type": "string" },
-        { "internalType": "enum DocumentNotary.Status", "name": "newStatus", "type": "uint8" },
-        { "internalType": "bytes32", "name": "hash", "type": "bytes32" }
+        {
+          "internalType": "string",
+          "name": "docId",
+          "type": "string"
+        },
+        {
+          "internalType": "enum DocumentNotary.Status",
+          "name": "newStatus",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "hash",
+          "type": "bytes32"
+        }
       ],
       "name": "signDocument",
       "outputs": [],
@@ -127,8 +454,16 @@
     },
     {
       "inputs": [
-        { "internalType": "string", "name": "docId", "type": "string" },
-        { "internalType": "bytes32", "name": "hash", "type": "bytes32" }
+        {
+          "internalType": "string",
+          "name": "docId",
+          "type": "string"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "hash",
+          "type": "bytes32"
+        }
       ],
       "name": "submitDocument",
       "outputs": [],
@@ -137,15 +472,191 @@
     },
     {
       "inputs": [
-        { "internalType": "string", "name": "docId", "type": "string" },
-        { "internalType": "uint8", "name": "requestedStatus", "type": "uint8" },
-        { "internalType": "bytes32", "name": "submittedHash", "type": "bytes32" }
+        {
+          "internalType": "string",
+          "name": "docId",
+          "type": "string"
+        },
+        {
+          "internalType": "uint8",
+          "name": "requestedStatus",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "submittedHash",
+          "type": "bytes32"
+        }
       ],
       "name": "verifyDocument",
       "outputs": [
-        { "internalType": "bool", "name": "isValid", "type": "bool" },
-        { "internalType": "bool", "name": "isPartial", "type": "bool" },
-        { "internalType": "string", "name": "message", "type": "string" }
+        {
+          "internalType": "bool",
+          "name": "isValid",
+          "type": "bool"
+        },
+        {
+          "internalType": "bool",
+          "name": "isPartial",
+          "type": "bool"
+        },
+        {
+          "internalType": "string",
+          "name": "message",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getRoleAdmin",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "grantRole",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        }
+      ],
+      "name": "grantRoleTo",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "hasRole",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "callerConfirmation",
+          "type": "address"
+        }
+      ],
+      "name": "renounceRole",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "revokeRole",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        }
+      ],
+      "name": "revokeRoleFrom",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes4",
+          "name": "interfaceId",
+          "type": "bytes4"
+        }
+      ],
+      "name": "supportsInterface",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
       ],
       "stateMutability": "view",
       "type": "function"

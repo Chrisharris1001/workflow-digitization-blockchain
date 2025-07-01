@@ -15,7 +15,7 @@ exports.downloadDocument = async (req, res) => {
             if (err) {
                 return res.status(404).json({ error: 'File not found' });
             }
-            // Use the original name (e.g., test3_2.pdf) for download
+            // Use the original name (example: test3.pdf) for download
             res.download(filePath, doc.name, (err) => {
                 if (err) {
                     res.status(500).json({ error: 'Error downloading file' });
